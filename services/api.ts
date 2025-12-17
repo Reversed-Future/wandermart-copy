@@ -422,6 +422,14 @@ export const getAttractions = async (filters: AttractionFilters = {}): Promise<A
     };
   });
 
+  // Sort by Average Rating (High to Low), then by Review Count
+  data.sort((a, b) => {
+    const ratingA = a.averageRating || 0;
+    const ratingB = b.averageRating || 0;
+    if (ratingB !== ratingA) return ratingB - ratingA;
+    return (b.reviewCount || 0) - (a.reviewCount || 0);
+  });
+
   return { success: true, data };
 };
 
