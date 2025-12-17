@@ -497,6 +497,12 @@ export const createAttraction = async (attractionData: Partial<Attraction>): Pro
         submittedById: attractionData.submittedById
     };
     setStorage('mock_attractions', [newAttraction, ...attractions]);
+    
+    // NOTIFICATION: Notify Admin if pending
+    if (status === 'pending') {
+        createNotification('admin1', 'New Attraction Submission', `User ${newAttraction.submittedBy || 'Unknown'} submitted "${newAttraction.title}" for review.`, 'info');
+    }
+
     return { success: true, data: newAttraction };
 };
 

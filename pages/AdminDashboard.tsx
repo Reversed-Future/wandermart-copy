@@ -58,9 +58,16 @@ export const AdminDashboard = () => {
               notify("Submission rejected", "info");
           });
       }
+      
+      // Close edit form if it matches the item being acted upon
+      if (editingAttr?.id === id) {
+          setIsEditing(false);
+          setEditingAttr(null);
+          setEditingImages([]);
+      }
   };
 
-  const handleSaveAttraction = async () => {
+  const handleSaveAttraction = async (targetStatus?: 'active') => {
       if (!editingAttr) return;
       
       if (!editingAttr.title || !editingAttr.description || !editingAttr.province || !editingAttr.city || !editingAttr.county) {
@@ -69,12 +76,27 @@ export const AdminDashboard = () => {
       }
 
       const payload = { ...editingAttr, imageUrls: editingImages };
+      if (targetStatus) {
+          payload.status = targetStatus;
+      }
 
       if (editingAttr.id) {
           // Update
           const res = await API.updateAttraction(editingAttr.id, payload);
           if (res.success && res.data) {
-              setAttractions(attractions.map(a => a.id === res.data!.id ? res.data! : a));
+              const updated = res.data;
+              
+              // If it was pending and is now active (approved)
+              if (editingAttr.status === 'pending' && updated.status === 'active') {
+                   setPendingAttractions(pendingAttractions.filter(a => a.id !== updated.id));
+                   setAttractions([updated, ...attractions]);
+              } else if (updated.status === 'pending') {
+                   // Still pending, just update the pending list info
+                   setPendingAttractions(pendingAttractions.map(a => a.id === updated.id ? updated : a));
+              } else {
+                   // Already active, just update list
+                   setAttractions(attractions.map(a => a.id === updated.id ? updated : a));
+              }
           }
       } else {
           // Create
@@ -86,7 +108,7 @@ export const AdminDashboard = () => {
       setIsEditing(false);
       setEditingAttr(null);
       setEditingImages([]);
-      notify("Attraction saved successfully", "success");
+      notify(targetStatus === 'active' ? "Attraction saved and published!" : "Attraction saved successfully", "success");
   };
 
   const handleDeleteAttraction = (id: string) => {
@@ -101,6 +123,11 @@ export const AdminDashboard = () => {
       setEditingAttr(attr || { title: '', description: '', address: '', province: '', city: '', county: '', tags: [], openHours: '', drivingTips: '', travelerTips: '' });
       setEditingImages(attr?.imageUrls || (attr?.imageUrl ? [attr.imageUrl] : []));
       setIsEditing(true);
+      
+      // Scroll to form slightly
+      setTimeout(() => {
+          document.getElementById('edit-form-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
   };
 
   const handleEditProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -237,7 +264,8 @@ export const AdminDashboard = () => {
                                           ))}
                                       </div>
                                   )}
-                                  <div className="flex gap-2">
+                                  <div className="flex flex-wrap gap-2">
+                                      <Button className="text-sm py-1" variant="secondary" onClick={() => openEdit(attr)}><Icons.Search /> Review / Edit Details</Button>
                                       <Button className="text-sm py-1 bg-green-600 hover:bg-green-700" onClick={() => handleAttractionApproval(attr.id, 'approve')}>Approve & Publish</Button>
                                       <Button variant="danger" className="text-sm py-1" onClick={() => handleAttractionApproval(attr.id, 'reject')}>Reject</Button>
                                   </div>
@@ -249,11 +277,14 @@ export const AdminDashboard = () => {
           </div>
       )}
 
-      {activeTab === 'attractions' && (
-          <div>
+      {(activeTab === 'attractions' || isEditing) && (
+          <div id="edit-form-anchor">
               {isEditing ? (
-                  <Card className="p-6 bg-gray-50">
-                      <h3 className="font-bold mb-4">{editingAttr?.id ? 'Edit Attraction' : 'New Attraction'}</h3>
+                  <Card className="p-6 bg-gray-50 mt-6 border-2 border-blue-100">
+                      <h3 className="font-bold mb-4 flex items-center gap-2 text-xl">
+                          {editingAttr?.id ? (editingAttr?.status === 'pending' ? 'Review Submission' : 'Edit Attraction') : 'New Attraction'}
+                          {editingAttr?.status === 'pending' && <Badge color="yellow">Pending</Badge>}
+                      </h3>
                       <div className="grid md:grid-cols-2 gap-4">
                           <Input label="Title *" value={editingAttr?.title} onChange={e => setEditingAttr({...editingAttr, title: e.target.value})} />
                           <Input label="Address *" value={editingAttr?.address} onChange={e => setEditingAttr({...editingAttr, address: e.target.value})} />
@@ -350,14 +381,26 @@ export const AdminDashboard = () => {
                              <Textarea label="Description *" value={editingAttr?.description} onChange={e => setEditingAttr({...editingAttr, description: e.target.value})} />
                           </div>
                       </div>
-                      <div className="mt-4 flex gap-2">
-                          <Button onClick={handleSaveAttraction}>Save</Button>
+                      <div className="mt-6 flex gap-3 pt-4 border-t border-gray-200">
+                          <Button onClick={() => handleSaveAttraction()}>Save Changes</Button>
+                          
+                          {/* If pending, allow Save & Approve */}
+                          {editingAttr?.status === 'pending' && (
+                              <Button 
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                                onClick={() => handleSaveAttraction('active')}
+                              >
+                                Save & Publish
+                              </Button>
+                          )}
+                          
                           <Button variant="secondary" onClick={() => setIsEditing(false)}>Cancel</Button>
                       </div>
                   </Card>
               ) : (
-                  <div>
-                      <div className="flex justify-end mb-4">
+                  <div className="mt-8">
+                      <div className="flex justify-between items-center mb-4">
+                          <h2 className="text-xl font-bold">All Attractions</h2>
                           <Button onClick={() => openEdit()}><Icons.Plus /> Add Attraction</Button>
                       </div>
                       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
