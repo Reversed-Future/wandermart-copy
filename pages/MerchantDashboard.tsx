@@ -24,7 +24,7 @@ export const MerchantDashboard = () => {
 
   useEffect(() => {
     if (user && user.status === 'active') {
-      API.getProducts(user.id).then(res => res.data && setProducts(res.data));
+      API.getProducts({ merchantId: user.id }).then(res => res.data && setProducts(res.data));
       API.getOrders(undefined, user.id).then(res => res.data && setOrders(res.data));
       API.getAttractions({}).then(res => res.data && setAttractions(res.data));
     }

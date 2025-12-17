@@ -153,6 +153,24 @@ const MOCK_PRODUCTS: Product[] = [
     stock: 50,
     imageUrl: 'https://picsum.photos/400/400?random=11',
     imageUrls: ['https://picsum.photos/400/400?random=11']
+  },
+  {
+    id: 'p3',
+    merchantId: 'm1',
+    merchantName: 'Panda Souvenirs',
+    attractionId: '2', // Forbidden City
+    attractionName: 'The Palace Museum (Forbidden City)',
+    name: 'Imperial Ceramic Tea Set',
+    description: 'A premium 5-piece ceramic tea set inspired by Qing Dynasty designs. Includes one teapot and four cups, packaged in a decorative gift box. The glaze features intricate blue and white patterns.',
+    price: 88.00,
+    stock: 15,
+    imageUrl: 'https://picsum.photos/400/400?random=20',
+    imageUrls: [
+        'https://picsum.photos/400/400?random=20',
+        'https://picsum.photos/400/400?random=21',
+        'https://picsum.photos/400/400?random=22',
+        'https://picsum.photos/400/400?random=23'
+    ]
   }
 ];
 
@@ -483,12 +501,45 @@ export const reportPost = async (postId: string, reporterId?: string): Promise<A
 
 // --- MERCHANT & PRODUCT SERVICES ---
 
-export const getProducts = async (merchantId?: string, attractionId?: string): Promise<ApiResponse<Product[]>> => {
+export interface ProductFilters {
+  merchantId?: string;
+  attractionId?: string;
+  query?: string;
+  province?: string;
+  city?: string;
+  county?: string;
+}
+
+export const getProducts = async (filters: ProductFilters = {}): Promise<ApiResponse<Product[]>> => {
   await delay(DELAY_MS);
   let allProducts = getStorage<Product[]>('mock_products', MOCK_PRODUCTS);
+  const attractions = getStorage<Attraction[]>('mock_attractions', MOCK_ATTRACTIONS);
   
-  if (merchantId) allProducts = allProducts.filter(p => p.merchantId === merchantId);
-  if (attractionId) allProducts = allProducts.filter(p => p.attractionId === attractionId);
+  if (filters.merchantId) allProducts = allProducts.filter(p => p.merchantId === filters.merchantId);
+  if (filters.attractionId) allProducts = allProducts.filter(p => p.attractionId === filters.attractionId);
+  
+  // Region filtering: Find attractions in the region, then filter products linked to them
+  if (filters.province || filters.city || filters.county) {
+      const validAttractionIds = attractions.filter(a => {
+          if (filters.province && a.province !== filters.province) return false;
+          if (filters.city && a.city !== filters.city) return false;
+          if (filters.county && a.county !== filters.county) return false;
+          return true;
+      }).map(a => a.id);
+
+      // Only show products linked to attractions in that region
+      allProducts = allProducts.filter(p => p.attractionId && validAttractionIds.includes(p.attractionId));
+  }
+
+  // Search query
+  if (filters.query) {
+    const q = filters.query.toLowerCase();
+    allProducts = allProducts.filter(p => 
+       p.name.toLowerCase().includes(q) || 
+       p.description.toLowerCase().includes(q) ||
+       (p.attractionName && p.attractionName.toLowerCase().includes(q))
+    );
+  }
   
   return { success: true, data: allProducts };
 };

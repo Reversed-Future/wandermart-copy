@@ -34,7 +34,7 @@ export const AttractionDetail = () => {
       Promise.all([
         API.getAttractionById(id),
         API.getPosts(id),
-        API.getProducts(undefined, id)
+        API.getProducts({ attractionId: id })
       ]).then(([attrRes, postRes, prodRes]) => {
         if (attrRes.data) setAttraction(attrRes.data);
         if (postRes.data) setPosts(postRes.data);
