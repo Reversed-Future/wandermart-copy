@@ -33,6 +33,7 @@ export interface Attraction {
   gallery?: string[]; // Legacy field, mapped to imageUrls slice(1)
   openHours?: string;
   drivingTips?: string;
+  travelerTips?: string; // New field for general advice
   status: 'active' | 'pending' | 'rejected'; // New field for approval workflow
   submittedBy?: string; // New field to track who uploaded it
   submittedById?: string; // ID of the user who submitted it
@@ -87,7 +88,7 @@ export interface Order {
   status: 'pending' | 'shipped' | 'delivered' | 'cancelled';
   trackingNumber?: string;
   createdAt: string;
-}
+  }
 
 export interface NotificationMessage {
   id: string;

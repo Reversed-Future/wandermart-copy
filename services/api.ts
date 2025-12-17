@@ -43,6 +43,7 @@ const MOCK_ATTRACTIONS: Attraction[] = [
     ],
     openHours: '07:30 - 18:00',
     drivingTips: 'Accessible by Metro Line 3. Parking available at South Gate.',
+    travelerTips: 'Arrive early in the morning (before 9 AM) to see active pandas during feeding time.',
     status: 'active'
   },
   {
@@ -63,6 +64,7 @@ const MOCK_ATTRACTIONS: Attraction[] = [
     ],
     openHours: '08:30 - 17:00',
     drivingTips: 'No public parking. Use public transport (Metro Line 1).',
+    travelerTips: 'Tickets must be booked online at least 7 days in advance. Closed on Mondays.',
     status: 'active'
   },
   {
@@ -80,6 +82,7 @@ const MOCK_ATTRACTIONS: Attraction[] = [
     gallery: ['https://picsum.photos/800/600?random=301'],
     openHours: '24 Hours',
     drivingTips: 'Traffic restrictions on weekends based on license plates.',
+    travelerTips: 'Best viewed by boat. Sunset at Leifeng Pagoda is spectacular.',
     status: 'active'
   },
   {
@@ -102,6 +105,7 @@ const MOCK_ATTRACTIONS: Attraction[] = [
     ],
     openHours: '08:00 - 17:00',
     drivingTips: 'Mountain roads. Careful driving required in winter.',
+    travelerTips: 'High altitude area, bring warm clothes even in summer. Allow at least 2 days for full exploration.',
     status: 'active'
   },
   {
@@ -118,6 +122,7 @@ const MOCK_ATTRACTIONS: Attraction[] = [
     imageUrls: ['https://picsum.photos/800/600?random=5'],
     openHours: '08:00 - 17:30',
     drivingTips: 'Take Chengguan Expressway. Parking lot is 2km from gate (shuttle available).',
+    travelerTips: 'The cable car saves time, but hiking up gives better views of the temples.',
     status: 'active'
   }
 ];
@@ -338,6 +343,7 @@ export const createAttraction = async (attractionData: Partial<Attraction>): Pro
         gallery: gallery,
         openHours: attractionData.openHours,
         drivingTips: attractionData.drivingTips,
+        travelerTips: attractionData.travelerTips,
         status: status,
         submittedBy: attractionData.submittedBy,
         submittedById: attractionData.submittedById

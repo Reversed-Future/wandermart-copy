@@ -196,7 +196,7 @@ export const AttractionDetail = () => {
               </div>
               <div className="md:col-span-2">
                 <p className="font-semibold text-gray-900">Driving Tips</p>
-                <p className="italic">{attraction.drivingTips}</p>
+                <p className="italic">{attraction.drivingTips || 'No specific tips available.'}</p>
               </div>
             </div>
             
@@ -334,7 +334,7 @@ export const AttractionDetail = () => {
       <div className="space-y-6">
         <Card className="p-4 bg-yellow-50 border-yellow-100">
            <h3 className="font-bold text-yellow-800 mb-2">Traveler Tips</h3>
-           <p className="text-sm text-yellow-700">Remember to check weather conditions before visiting natural attractions. Stay safe!</p>
+           <p className="text-sm text-yellow-700">{attraction.travelerTips || 'Always check weather conditions before visiting natural attractions. Stay safe!'}</p>
         </Card>
       </div>
     </div>

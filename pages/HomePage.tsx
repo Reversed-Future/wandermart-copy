@@ -23,7 +23,8 @@ export const HomePage = () => {
   // Suggestion State
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestion, setSuggestion] = useState<Partial<Attraction>>({
-    title: '', description: '', address: '', province: '', city: '', county: '', tags: []
+    title: '', description: '', address: '', province: '', city: '', county: '', tags: [],
+    openHours: '', drivingTips: '', travelerTips: ''
   });
   const [suggestionImages, setSuggestionImages] = useState<string[]>([]);
 
@@ -88,7 +89,7 @@ export const HomePage = () => {
     if (res.success) {
         notify("Attraction submitted successfully! It is pending admin approval.", "success");
         setIsSuggesting(false);
-        setSuggestion({ title: '', description: '', address: '', province: '', city: '', county: '', tags: [] });
+        setSuggestion({ title: '', description: '', address: '', province: '', city: '', county: '', tags: [], openHours: '', drivingTips: '', travelerTips: '' });
         setSuggestionImages([]);
     }
   };
@@ -272,6 +273,16 @@ export const HomePage = () => {
                             </button>
                         ))}
                     </div>
+                  </div>
+
+                  <div className="md:col-span-2">
+                      <Input label="Open Hours (Optional)" value={suggestion.openHours || ''} onChange={e => setSuggestion({...suggestion, openHours: e.target.value})} />
+                  </div>
+                  <div className="md:col-span-2">
+                      <Textarea label="Driving Tips (Optional)" value={suggestion.drivingTips || ''} onChange={e => setSuggestion({...suggestion, drivingTips: e.target.value})} />
+                  </div>
+                  <div className="md:col-span-2">
+                      <Textarea label="Traveler Tips (Optional)" value={suggestion.travelerTips || ''} onChange={e => setSuggestion({...suggestion, travelerTips: e.target.value})} />
                   </div>
 
                   <div className="md:col-span-2">

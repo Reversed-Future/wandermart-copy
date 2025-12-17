@@ -98,7 +98,7 @@ export const AdminDashboard = () => {
   };
 
   const openEdit = (attr?: Attraction) => {
-      setEditingAttr(attr || { title: '', description: '', address: '', province: '', city: '', county: '', tags: [] });
+      setEditingAttr(attr || { title: '', description: '', address: '', province: '', city: '', county: '', tags: [], openHours: '', drivingTips: '', travelerTips: '' });
       setEditingImages(attr?.imageUrls || (attr?.imageUrl ? [attr.imageUrl] : []));
       setIsEditing(true);
   };
@@ -334,6 +334,16 @@ export const AdminDashboard = () => {
                                     </button>
                                 ))}
                             </div>
+                          </div>
+                          
+                          <div className="md:col-span-2">
+                              <Input label="Open Hours" value={editingAttr?.openHours || ''} onChange={e => setEditingAttr({...editingAttr, openHours: e.target.value})} />
+                          </div>
+                          <div className="md:col-span-2">
+                              <Textarea label="Driving Tips" value={editingAttr?.drivingTips || ''} onChange={e => setEditingAttr({...editingAttr, drivingTips: e.target.value})} />
+                          </div>
+                          <div className="md:col-span-2">
+                              <Textarea label="Traveler Tips" value={editingAttr?.travelerTips || ''} onChange={e => setEditingAttr({...editingAttr, travelerTips: e.target.value})} />
                           </div>
 
                           <div className="md:col-span-2">
