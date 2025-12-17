@@ -307,6 +307,7 @@ export const HomePage = () => {
                         <div className="flex flex-wrap gap-2 mb-2">
                           {attr.province && <Badge color="blue">{attr.province}</Badge>}
                           {attr.city && <Badge color="indigo">{attr.city}</Badge>}
+                          {attr.county && <Badge color="purple">{attr.county}</Badge>}
                         </div>
                         <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-blue-600 transition-colors">{attr.title}</h3>
                         <p className="text-gray-600 text-sm line-clamp-2 mb-4 flex-grow">{attr.description}</p>
