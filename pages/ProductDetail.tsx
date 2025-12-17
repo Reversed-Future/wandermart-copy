@@ -53,7 +53,7 @@ export const ProductDetail = () => {
             <div className="flex flex-col gap-1 mb-6 border-b border-gray-100 pb-4">
               <span className="text-sm text-gray-500">Sold by {product.merchantName}</span>
               {product.attractionName && (
-                <div className="flex items-center gap-1 text-sm text-purple-700 font-medium">
+                <div className="flex items-center gap-1 text-sm text-gray-600 font-medium">
                   <Icons.MapPin />
                   <span>Available at: </span>
                   <Link to={`/attractions/${product.attractionId}`} className="hover:underline">

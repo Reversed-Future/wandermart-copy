@@ -31,7 +31,7 @@ export const ProductList = () => {
               <div className="mb-2">
                  <p className="text-gray-500 text-xs">Sold by {product.merchantName}</p>
                  {product.attractionName && (
-                   <Link to={`/attractions/${product.attractionId}`} className="text-xs text-purple-600 font-medium hover:underline block mt-1">
+                   <Link to={`/attractions/${product.attractionId}`} className="text-xs text-gray-500 font-medium hover:underline block mt-1">
                      📍 {product.attractionName}
                    </Link>
                  )}

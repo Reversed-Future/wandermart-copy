@@ -201,13 +201,10 @@ export const MerchantDashboard = () => {
                   <div>
                     <div className="font-medium">{p.name}</div>
                     <div className="text-sm text-gray-500">Stock: {p.stock} | ${p.price}</div>
-                    {p.attractionName && <span className="text-xs text-purple-600 block mt-1">📍 {p.attractionName}</span>}
+                    {p.attractionName && <span className="text-xs text-gray-500 block mt-1">📍 {p.attractionName}</span>}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                    {p.attractionId && (
-                       <Badge color="purple">Linked</Badge>
-                    )}
                     <div className="flex gap-2">
                         <Button variant="secondary" className="px-2 py-1 text-xs" onClick={() => openEditForm(p)}>Edit</Button>
                         <Button variant="danger" className="px-2 py-1 text-xs" onClick={() => handleDeleteProduct(p.id)}>Delete</Button>
