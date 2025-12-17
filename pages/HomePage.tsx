@@ -5,20 +5,7 @@ import * as API from '../services/api';
 import { Attraction } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-
-// --- STATIC REGION DATA FOR CASCADING SELECTS ---
-const REGION_DATA: Record<string, Record<string, string[]>> = {
-  '北京市': {
-    '北京市': ['东城区', '西城区', '朝阳区', '海淀区', '丰台区', '延庆区']
-  },
-  '四川省': { 
-    '成都市': ['锦江区', '青羊区', '金牛区', '武侯区', '成华区', '都江堰市'],
-    '阿坝藏族羌族自治州': ['马尔康市', '九寨沟县', '若尔盖县']
-  },
-  '浙江省': {
-    '杭州市': ['上城区', '拱墅区', '西湖区', '滨江区']
-  }
-};
+import { REGION_DATA } from '../data/china_regions';
 
 const uniqueTags = Array.from(new Set([
   'Nature', 'Hiking', 'Water', 
@@ -85,8 +72,8 @@ export const HomePage = () => {
   };
 
   const handleSuggestionSubmit = async () => {
-    if (!suggestion.title || !suggestion.description || !suggestion.province) {
-        notify("Please fill in the required fields.", "error");
+    if (!suggestion.title || !suggestion.description || !suggestion.province || !suggestion.city || !suggestion.county) {
+        notify("Please fill in all required fields (Province, City, County).", "error");
         return;
     }
 
@@ -104,6 +91,23 @@ export const HomePage = () => {
         setSuggestion({ title: '', description: '', address: '', province: '', city: '', county: '', tags: [] });
         setSuggestionImages([]);
     }
+  };
+
+  const handleSuggestionProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setSuggestion({
+          ...suggestion, 
+          province: e.target.value,
+          city: '',
+          county: ''
+      });
+  };
+
+  const handleSuggestionCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setSuggestion({
+          ...suggestion, 
+          city: e.target.value,
+          county: ''
+      });
   };
 
   return (
@@ -189,11 +193,52 @@ export const HomePage = () => {
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                   <Input label="Title *" value={suggestion.title} onChange={e => setSuggestion({...suggestion, title: e.target.value})} />
-                  <Input label="Address" value={suggestion.address} onChange={e => setSuggestion({...suggestion, address: e.target.value})} />
+                  <Input label="Address *" value={suggestion.address} onChange={e => setSuggestion({...suggestion, address: e.target.value})} />
                   
-                  <Input label="Province *" value={suggestion.province} onChange={e => setSuggestion({...suggestion, province: e.target.value})} placeholder="e.g. 四川省" />
-                  <Input label="City" value={suggestion.city} onChange={e => setSuggestion({...suggestion, city: e.target.value})} placeholder="e.g. 成都市" />
-                  <Input label="County" value={suggestion.county} onChange={e => setSuggestion({...suggestion, county: e.target.value})} />
+                  {/* Province */}
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Province *</label>
+                      <select 
+                          className="w-full border border-gray-300 rounded px-3 py-2"
+                          value={suggestion.province}
+                          onChange={handleSuggestionProvinceChange}
+                      >
+                          <option value="">Select Province</option>
+                          {Object.keys(REGION_DATA).map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                  </div>
+
+                  {/* City */}
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                      <select 
+                          className="w-full border border-gray-300 rounded px-3 py-2 disabled:bg-gray-100"
+                          value={suggestion.city}
+                          onChange={handleSuggestionCityChange}
+                          disabled={!suggestion.province}
+                      >
+                          <option value="">Select City</option>
+                          {suggestion.province && REGION_DATA[suggestion.province] && Object.keys(REGION_DATA[suggestion.province]).map(c => (
+                              <option key={c} value={c}>{c}</option>
+                          ))}
+                      </select>
+                  </div>
+
+                  {/* County */}
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">County *</label>
+                      <select 
+                          className="w-full border border-gray-300 rounded px-3 py-2 disabled:bg-gray-100"
+                          value={suggestion.county}
+                          onChange={e => setSuggestion({...suggestion, county: e.target.value})}
+                          disabled={!suggestion.city}
+                      >
+                          <option value="">Select County</option>
+                          {suggestion.province && suggestion.city && REGION_DATA[suggestion.province][suggestion.city] && REGION_DATA[suggestion.province][suggestion.city].map(c => (
+                              <option key={c} value={c}>{c}</option>
+                          ))}
+                      </select>
+                  </div>
                   
                   <div className="md:col-span-2">
                      <ImageUploader 

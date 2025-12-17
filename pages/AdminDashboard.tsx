@@ -3,6 +3,7 @@ import { Button, Input, Card, Badge, Alert, ImageUploader, Textarea, Icons } fro
 import * as API from '../services/api';
 import { User, Attraction, Post } from '../types';
 import { useNotification } from '../contexts/NotificationContext';
+import { REGION_DATA } from '../data/china_regions';
 
 const uniqueTags = Array.from(new Set([
   'Nature', 'Hiking', 'Water', 
@@ -61,6 +62,11 @@ export const AdminDashboard = () => {
 
   const handleSaveAttraction = async () => {
       if (!editingAttr) return;
+      
+      if (!editingAttr.title || !editingAttr.description || !editingAttr.province || !editingAttr.city || !editingAttr.county) {
+          notify("Please fill in all required fields (Title, Description, Province, City, County).", "error");
+          return;
+      }
 
       const payload = { ...editingAttr, imageUrls: editingImages };
 
@@ -95,6 +101,25 @@ export const AdminDashboard = () => {
       setEditingAttr(attr || { title: '', description: '', address: '', province: '', city: '', county: '', tags: [] });
       setEditingImages(attr?.imageUrls || (attr?.imageUrl ? [attr.imageUrl] : []));
       setIsEditing(true);
+  };
+
+  const handleEditProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      if (!editingAttr) return;
+      setEditingAttr({
+          ...editingAttr, 
+          province: e.target.value,
+          city: '',
+          county: ''
+      });
+  };
+
+  const handleEditCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      if (!editingAttr) return;
+      setEditingAttr({
+          ...editingAttr, 
+          city: e.target.value,
+          county: ''
+      });
   };
 
   return (
@@ -230,12 +255,53 @@ export const AdminDashboard = () => {
                   <Card className="p-6 bg-gray-50">
                       <h3 className="font-bold mb-4">{editingAttr?.id ? 'Edit Attraction' : 'New Attraction'}</h3>
                       <div className="grid md:grid-cols-2 gap-4">
-                          <Input label="Title" value={editingAttr?.title} onChange={e => setEditingAttr({...editingAttr, title: e.target.value})} />
-                          <Input label="Address" value={editingAttr?.address} onChange={e => setEditingAttr({...editingAttr, address: e.target.value})} />
+                          <Input label="Title *" value={editingAttr?.title} onChange={e => setEditingAttr({...editingAttr, title: e.target.value})} />
+                          <Input label="Address *" value={editingAttr?.address} onChange={e => setEditingAttr({...editingAttr, address: e.target.value})} />
                           
-                          <Input label="Province" value={editingAttr?.province} onChange={e => setEditingAttr({...editingAttr, province: e.target.value})} />
-                          <Input label="City" value={editingAttr?.city} onChange={e => setEditingAttr({...editingAttr, city: e.target.value})} />
-                          <Input label="County" value={editingAttr?.county} onChange={e => setEditingAttr({...editingAttr, county: e.target.value})} />
+                          {/* Province */}
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Province *</label>
+                              <select 
+                                  className="w-full border border-gray-300 rounded px-3 py-2"
+                                  value={editingAttr?.province || ''}
+                                  onChange={handleEditProvinceChange}
+                              >
+                                  <option value="">Select Province</option>
+                                  {Object.keys(REGION_DATA).map(p => <option key={p} value={p}>{p}</option>)}
+                              </select>
+                          </div>
+
+                          {/* City */}
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                              <select 
+                                  className="w-full border border-gray-300 rounded px-3 py-2 disabled:bg-gray-100"
+                                  value={editingAttr?.city || ''}
+                                  onChange={handleEditCityChange}
+                                  disabled={!editingAttr?.province}
+                              >
+                                  <option value="">Select City</option>
+                                  {editingAttr?.province && REGION_DATA[editingAttr.province] && Object.keys(REGION_DATA[editingAttr.province]).map(c => (
+                                      <option key={c} value={c}>{c}</option>
+                                  ))}
+                              </select>
+                          </div>
+
+                          {/* County */}
+                          <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">County *</label>
+                              <select 
+                                  className="w-full border border-gray-300 rounded px-3 py-2 disabled:bg-gray-100"
+                                  value={editingAttr?.county || ''}
+                                  onChange={e => setEditingAttr({...editingAttr, county: e.target.value})}
+                                  disabled={!editingAttr?.city}
+                              >
+                                  <option value="">Select County</option>
+                                  {editingAttr?.province && editingAttr?.city && REGION_DATA[editingAttr.province][editingAttr.city] && REGION_DATA[editingAttr.province][editingAttr.city].map(c => (
+                                      <option key={c} value={c}>{c}</option>
+                                  ))}
+                              </select>
+                          </div>
                           
                           <div className="md:col-span-2">
                              <ImageUploader 
@@ -271,7 +337,7 @@ export const AdminDashboard = () => {
                           </div>
 
                           <div className="md:col-span-2">
-                             <Textarea label="Description" value={editingAttr?.description} onChange={e => setEditingAttr({...editingAttr, description: e.target.value})} />
+                             <Textarea label="Description *" value={editingAttr?.description} onChange={e => setEditingAttr({...editingAttr, description: e.target.value})} />
                           </div>
                       </div>
                       <div className="mt-4 flex gap-2">
