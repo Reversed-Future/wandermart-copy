@@ -37,6 +37,8 @@ export interface Attraction {
   status: 'active' | 'pending' | 'rejected'; // New field for approval workflow
   submittedBy?: string; // New field to track who uploaded it
   submittedById?: string; // ID of the user who submitted it
+  averageRating?: number; // Calculated field
+  reviewCount?: number; // Calculated field
 }
 
 export interface Post {

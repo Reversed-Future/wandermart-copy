@@ -79,9 +79,9 @@ export const Alert: React.FC<{ children: React.ReactNode; type?: 'error' | 'succ
   );
 };
 
-export const StarRating: React.FC<{ rating: number; onRatingChange?: (r: number) => void; readonly?: boolean }> = ({ rating, onRatingChange, readonly = false }) => {
+export const StarRating: React.FC<{ rating: number; onRatingChange?: (r: number) => void; readonly?: boolean; className?: string }> = ({ rating, onRatingChange, readonly = false, className = "text-yellow-400" }) => {
   return (
-    <div className="flex text-yellow-400">
+    <div className={`flex ${className}`}>
       {[1, 2, 3, 4, 5].map((star) => (
         <button
           key={star}

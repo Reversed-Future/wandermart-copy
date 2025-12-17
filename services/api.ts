@@ -124,7 +124,100 @@ const MOCK_ATTRACTIONS: Attraction[] = [
     drivingTips: 'Take Chengguan Expressway. Parking lot is 2km from gate (shuttle available).',
     travelerTips: 'The cable car saves time, but hiking up gives better views of the temples.',
     status: 'active'
+  },
+  {
+    id: '6',
+    title: 'The Great Wall (Mutianyu)',
+    description: 'One of the best-preserved sections of the Great Wall, offering spectacular views and less crowding.',
+    address: 'Mutianyu Road, Huairou District, Beijing',
+    province: '北京市',
+    city: '市辖区',
+    county: '怀柔区',
+    region: '北京市 怀柔区',
+    tags: ['History', 'Hiking', 'Architecture', 'Mountain'],
+    imageUrl: 'https://picsum.photos/800/600?random=6',
+    imageUrls: ['https://picsum.photos/800/600?random=6', 'https://picsum.photos/800/600?random=601'],
+    gallery: ['https://picsum.photos/800/600?random=601'],
+    openHours: '07:30 - 17:30',
+    drivingTips: 'About 1.5 hours drive from Beijing city center. Parking is spacious.',
+    travelerTips: 'Take the toboggan down for a fun experience!',
+    status: 'active'
   }
+];
+
+const MOCK_POSTS: Post[] = [
+    {
+      id: 'post-101',
+      attractionId: '6',
+      userId: 'u1',
+      username: 'Traveler User',
+      content: 'Absolutely breathtaking views! The climb was steep but worth every step.',
+      rating: 5,
+      likes: 12,
+      comments: [],
+      createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+      status: 'active'
+    },
+    {
+      id: 'post-102',
+      attractionId: '6',
+      userId: 'u2',
+      username: 'Hiker123',
+      content: 'Less crowded than Badaling. The autumn colors were amazing.',
+      rating: 5,
+      likes: 8,
+      comments: [],
+      createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
+      status: 'active'
+    },
+    {
+      id: 'post-103',
+      attractionId: '6',
+      userId: 'u3',
+      username: 'HistoryBuff',
+      content: 'Great restoration work. Very accessible with the cable car.',
+      rating: 4,
+      likes: 5,
+      comments: [],
+      createdAt: new Date(Date.now() - 86400000 * 15).toISOString(),
+      status: 'active'
+    },
+    {
+      id: 'post-104',
+      attractionId: '6',
+      userId: 'u4',
+      username: 'PandaFan',
+      content: 'The toboggan ride down is a must-do! So much fun.',
+      rating: 5,
+      likes: 20,
+      comments: [],
+      createdAt: new Date(Date.now() - 86400000 * 20).toISOString(),
+      status: 'active'
+    },
+    {
+      id: 'post-105',
+      attractionId: '6',
+      userId: 'u5',
+      username: 'GlobalTrekker',
+      content: 'A bit pricey for the cable car, but the wall itself is majestic.',
+      rating: 4,
+      likes: 3,
+      comments: [],
+      createdAt: new Date(Date.now() - 86400000 * 25).toISOString(),
+      status: 'active'
+    },
+    {
+      id: 'post-106',
+      attractionId: '6',
+      userId: 'u6',
+      username: 'LocalGuide',
+      content: 'Best time to visit is early morning to avoid tour groups.',
+      rating: 5,
+      likes: 15,
+      comments: [],
+      createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
+      status: 'active'
+    }
 ];
 
 const MOCK_PRODUCTS: Product[] = [
@@ -297,6 +390,8 @@ export const getAttractions = async (filters: AttractionFilters = {}): Promise<A
   await delay(DELAY_MS);
   // Use getStorage to ensure persistence for admin edits
   let data = getStorage<Attraction[]>('mock_attractions', MOCK_ATTRACTIONS);
+  // Ensure we have posts loaded, defaulting to the mock data if empty
+  const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
   
   // Only return active attractions for the general list
   data = data.filter(a => a.status === 'active');
@@ -311,6 +406,22 @@ export const getAttractions = async (filters: AttractionFilters = {}): Promise<A
     const q = filters.query.toLowerCase();
     data = data.filter(a => a.title.toLowerCase().includes(q) || a.description.toLowerCase().includes(q));
   }
+
+  // Calculate ratings for each attraction
+  data = data.map(attr => {
+    // Only count active posts with a rating
+    const attrPosts = posts.filter(p => p.attractionId === attr.id && p.status === 'active' && typeof p.rating === 'number');
+    const count = attrPosts.length;
+    const totalRating = attrPosts.reduce((acc, p) => acc + (p.rating || 0), 0);
+    const avg = count > 0 ? totalRating / count : 0;
+    
+    return {
+      ...attr,
+      reviewCount: count,
+      averageRating: avg
+    };
+  });
+
   return { success: true, data };
 };
 
@@ -327,7 +438,18 @@ export const getAttractionById = async (id: string): Promise<ApiResponse<Attract
   // Allow viewing pending attractions if accessed directly (e.g. by admin or creator), 
   // though in a real app this would be permission-gated.
   const attraction = data.find(a => a.id === id);
-  return attraction ? { success: true, data: attraction } : { success: false, message: 'Not found' };
+
+  if (attraction) {
+    const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
+    const attrPosts = posts.filter(p => p.attractionId === attraction.id && p.status === 'active' && typeof p.rating === 'number');
+    const count = attrPosts.length;
+    const totalRating = attrPosts.reduce((acc, p) => acc + (p.rating || 0), 0);
+    const avg = count > 0 ? totalRating / count : 0;
+    
+    return { success: true, data: { ...attraction, reviewCount: count, averageRating: avg } };
+  }
+  
+  return { success: false, message: 'Not found' };
 };
 
 export const createAttraction = async (attractionData: Partial<Attraction>): Promise<ApiResponse<Attraction>> => {
@@ -419,7 +541,7 @@ export const deleteAttraction = async (id: string): Promise<ApiResponse<boolean>
 
 export const getPosts = async (attractionId?: string): Promise<ApiResponse<Post[]>> => {
   await delay(DELAY_MS);
-  const allPosts = getStorage<Post[]>('mock_posts', []);
+  const allPosts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
   
   // Filter out reported posts for public view. 
   // Reported posts are only visible to Admins via getReportedContent.
@@ -449,14 +571,14 @@ export const createPost = async (postData: Partial<Post>): Promise<ApiResponse<P
     createdAt: new Date().toISOString(),
     status: 'active'
   };
-  const posts = getStorage<Post[]>('mock_posts', []);
+  const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
   setStorage('mock_posts', [newPost, ...posts]);
   return { success: true, data: newPost };
 };
 
 export const updatePost = async (id: string, updates: Partial<Post>): Promise<ApiResponse<Post>> => {
   await delay(DELAY_MS);
-  const posts = getStorage<Post[]>('mock_posts', []);
+  const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
   const index = posts.findIndex(p => p.id === id);
   if (index === -1) return { success: false, message: 'Post not found' };
 
@@ -474,7 +596,7 @@ export const updatePost = async (id: string, updates: Partial<Post>): Promise<Ap
 
 export const deletePost = async (id: string): Promise<ApiResponse<boolean>> => {
   await delay(DELAY_MS);
-  let posts = getStorage<Post[]>('mock_posts', []);
+  let posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
   posts = posts.filter(p => p.id !== id);
   setStorage('mock_posts', posts);
   return { success: true, data: true };
@@ -483,7 +605,7 @@ export const deletePost = async (id: string): Promise<ApiResponse<boolean>> => {
 export const reportPost = async (postId: string, reporterId?: string): Promise<ApiResponse<boolean>> => {
   await delay(DELAY_MS);
   // Updates status to 'reported', which removes it from getPosts() view but adds it to getReportedContent()
-  const posts = getStorage<Post[]>('mock_posts', []);
+  const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
   const updated = posts.map(p => p.id === postId ? { ...p, status: 'reported' as const } : p);
   setStorage('mock_posts', updated);
   
@@ -692,13 +814,13 @@ export const updateOrderStatus = async (orderId: string, status: Order['status']
 export const getReportedContent = async (): Promise<ApiResponse<Post[]>> => {
   await delay(DELAY_MS);
   // Fetch raw posts to find 'reported' ones, as getPosts() filters them out
-  const posts = getStorage<Post[]>('mock_posts', []);
+  const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
   return { success: true, data: posts.filter(p => p.status === 'reported') };
 };
 
 export const moderateContent = async (id: string, action: 'approve' | 'delete'): Promise<ApiResponse<boolean>> => {
   await delay(DELAY_MS);
-  let posts = getStorage<Post[]>('mock_posts', []);
+  let posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
   const post = posts.find(p => p.id === id);
 
   if (action === 'delete') {

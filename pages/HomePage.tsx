@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Button, Input, Card, Badge, Icons, Textarea, ImageUploader } from '../components/ui';
+import { Button, Input, Card, Badge, Icons, Textarea, ImageUploader, StarRating } from '../components/ui';
 import * as API from '../services/api';
 import { Attraction } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -308,27 +308,51 @@ export const HomePage = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {attractions.map(attr => (
-                  <Link key={attr.id} to={`/attractions/${attr.id}`} className="block h-full group">
-                    <Card className="h-full hover:shadow-lg transition-all duration-200 border-transparent hover:border-blue-200 flex flex-col">
-                      <div className="relative h-48 overflow-hidden">
-                        <img src={attr.imageUrl} alt={attr.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                      </div>
-                      <div className="p-4 flex flex-col flex-grow">
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {attr.province && <Badge color="blue">{attr.province}</Badge>}
-                          {attr.city && <Badge color="indigo">{attr.city}</Badge>}
-                          {attr.county && <Badge color="purple">{attr.county}</Badge>}
+                {attractions.map(attr => {
+                  const hasEnoughRatings = (attr.reviewCount || 0) > 5;
+                  
+                  return (
+                    <Link key={attr.id} to={`/attractions/${attr.id}`} className="block h-full group">
+                      <Card className="h-full hover:shadow-lg transition-all duration-200 border-transparent hover:border-blue-200 flex flex-col">
+                        <div className="relative h-48 overflow-hidden">
+                          <img src={attr.imageUrl} alt={attr.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                         </div>
-                        <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-blue-600 transition-colors">{attr.title}</h3>
-                        <p className="text-gray-600 text-sm line-clamp-2 mb-4 flex-grow">{attr.description}</p>
-                        <div className="flex flex-wrap gap-1 mt-auto">
-                           {attr.tags.slice(0, 3).map(t => <Badge key={t} color="green">{t}</Badge>)}
+                        <div className="p-4 flex flex-col flex-grow">
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {attr.province && <Badge color="blue">{attr.province}</Badge>}
+                            {attr.city && <Badge color="indigo">{attr.city}</Badge>}
+                            {attr.county && <Badge color="purple">{attr.county}</Badge>}
+                          </div>
+                          <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-blue-600 transition-colors">{attr.title}</h3>
+                          <div className="mb-2">
+                              {hasEnoughRatings ? (
+                                  <div className="flex items-center gap-2">
+                                      <StarRating rating={attr.averageRating || 0} readonly />
+                                      <span className="text-xs text-gray-500 font-medium">({attr.reviewCount} reviews)</span>
+                                  </div>
+                              ) : (
+                                  <div className="relative group/tooltip inline-block">
+                                      <div className="flex items-center gap-2 grayscale opacity-60">
+                                          <StarRating rating={0} readonly className="text-gray-300" />
+                                          <span className="text-xs text-gray-400">Not rated</span>
+                                      </div>
+                                      <div className="absolute bottom-full left-0 mb-2 hidden group-hover/tooltip:block z-10">
+                                          <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                                              评价数不够 ({attr.reviewCount || 0}/5)
+                                          </div>
+                                      </div>
+                                  </div>
+                              )}
+                          </div>
+                          <p className="text-gray-600 text-sm line-clamp-2 mb-4 flex-grow">{attr.description}</p>
+                          <div className="flex flex-wrap gap-1 mt-auto">
+                             {attr.tags.slice(0, 3).map(t => <Badge key={t} color="green">{t}</Badge>)}
+                          </div>
                         </div>
-                      </div>
-                    </Card>
-                  </Link>
-                ))}
+                      </Card>
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </>
