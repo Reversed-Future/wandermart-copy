@@ -253,23 +253,24 @@ export const HomePage = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {attractions.map(attr => (
-                  <Card key={attr.id} className="hover:shadow-md transition-shadow flex flex-col h-full">
-                    <img src={attr.imageUrl} alt={attr.title} className="w-full h-48 object-cover" />
-                    <div className="p-4 flex flex-col flex-grow">
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {attr.province && <Badge color="blue">{attr.province}</Badge>}
-                        {attr.city && <Badge color="indigo">{attr.city}</Badge>}
+                  <Link key={attr.id} to={`/attractions/${attr.id}`} className="block h-full group">
+                    <Card className="h-full hover:shadow-lg transition-all duration-200 border-transparent hover:border-blue-200 flex flex-col">
+                      <div className="relative h-48 overflow-hidden">
+                        <img src={attr.imageUrl} alt={attr.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       </div>
-                      <h3 className="text-xl font-bold mb-2 text-gray-900">{attr.title}</h3>
-                      <p className="text-gray-600 text-sm line-clamp-2 mb-4 flex-grow">{attr.description}</p>
-                      <div className="flex flex-wrap gap-1 mb-4">
-                         {attr.tags.slice(0, 3).map(t => <Badge key={t} color="green">{t}</Badge>)}
+                      <div className="p-4 flex flex-col flex-grow">
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {attr.province && <Badge color="blue">{attr.province}</Badge>}
+                          {attr.city && <Badge color="indigo">{attr.city}</Badge>}
+                        </div>
+                        <h3 className="text-xl font-bold mb-2 text-gray-900 group-hover:text-blue-600 transition-colors">{attr.title}</h3>
+                        <p className="text-gray-600 text-sm line-clamp-2 mb-4 flex-grow">{attr.description}</p>
+                        <div className="flex flex-wrap gap-1 mt-auto">
+                           {attr.tags.slice(0, 3).map(t => <Badge key={t} color="green">{t}</Badge>)}
+                        </div>
                       </div>
-                      <Link to={`/attractions/${attr.id}`} className="mt-auto">
-                        <Button variant="secondary" className="w-full text-sm">View Details</Button>
-                      </Link>
-                    </div>
-                  </Card>
+                    </Card>
+                  </Link>
                 ))}
               </div>
             )}
