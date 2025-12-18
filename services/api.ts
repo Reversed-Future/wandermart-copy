@@ -1,8 +1,7 @@
-import { Attraction, Post, Product, User, UserRole, Order, ApiResponse, NotificationMessage } from '../types';
+import { Attraction, Post, Product, User, UserRole, Order, ApiResponse, NotificationMessage, AUTH_SESSION_KEY } from '../types';
 
 const API_BASE = '/api/v1';
 const DELAY_MS = 600;
-const SESSION_KEY = 'wander_mart_session';
 
 export const getApiMode = (): 'mock' | 'real' => {
   return (localStorage.getItem('api_mode') as 'mock' | 'real') || 'mock';
@@ -26,11 +25,17 @@ const setStorage = (key: string, val: any) => {
 // --- MOCK SERVER-SIDE HELPERS ---
 
 /**
- * Simulates a server-side session check (normally via JWT).
- * This ensures the "backend" knows who is making the request.
+ * Simulates a server-side session check.
  */
 const getAuthSession = (): User | null => {
-    return getStorage<User | null>(SESSION_KEY, null);
+    return getStorage<User | null>(AUTH_SESSION_KEY, null);
+};
+
+/**
+ * Establishes a session. This simulates the backend setting a secure cookie or issuing a token.
+ */
+const establishSession = (user: User) => {
+    setStorage(AUTH_SESSION_KEY, { ...user, token: `mock-jwt-${user.id}` });
 };
 
 const ensureRole = (roles: UserRole[]): ApiResponse<any> | null => {
@@ -59,23 +64,6 @@ const MOCK_ATTRACTIONS: Attraction[] = [
     openHours: '07:30 - 18:00',
     drivingTips: 'Accessible by Metro Line 3. Parking available at South Gate.',
     travelerTips: 'Arrive early in the morning (before 9 AM) to see active pandas during feeding time.',
-    status: 'active'
-  },
-  {
-    id: '2',
-    title: 'The Palace Museum (Forbidden City)',
-    description: 'Imperial palace of the Ming and Qing dynasties. A masterpiece of Chinese architecture.',
-    address: '4 Jingshan Front St, Dongcheng District, Beijing',
-    province: '北京市',
-    city: '市辖区',
-    county: '东城区',
-    region: '市辖区 东城区',
-    tags: ['History', 'Culture', 'Architecture'],
-    imageUrl: 'https://picsum.photos/800/600?random=2',
-    imageUrls: ['https://picsum.photos/800/600?random=2', 'https://picsum.photos/800/600?random=201'],
-    openHours: '08:30 - 17:00',
-    drivingTips: 'No public parking. Use public transport (Metro Line 1).',
-    travelerTips: 'Tickets must be booked online at least 7 days in advance. Closed on Mondays.',
     status: 'active'
   }
 ];
@@ -145,21 +133,32 @@ export const login = async (email: string, password: string): Promise<ApiRespons
   await delay(DELAY_MS);
   const users = getStorage<User[]>('mock_users', INITIAL_USERS);
   const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-  if (user) return { success: true, data: { ...user, token: `mock-jwt-${user.id}` } };
+  
+  if (user) {
+    // BACKEND LOGIC: Establish session before returning
+    establishSession(user);
+    return { success: true, data: user };
+  }
   return { success: false, message: 'Invalid credentials.' };
+};
+
+export const logout = async (): Promise<ApiResponse<boolean>> => {
+    await delay(200);
+    localStorage.removeItem(AUTH_SESSION_KEY);
+    return { success: true, data: true };
 };
 
 export const register = async (userData: Partial<User>, password: string): Promise<ApiResponse<User>> => {
   await delay(DELAY_MS);
   const users = getStorage<User[]>('mock_users', INITIAL_USERS);
   if (users.find(u => u.email === userData.email)) return { success: false, message: 'Email already exists' };
+  
   const newUser: User = {
     id: `u-${Date.now()}`,
     username: userData.username || userData.email!.split('@')[0],
     email: userData.email!,
     role: userData.role || UserRole.TRAVELER,
     status: userData.role === UserRole.MERCHANT ? 'pending' : 'active',
-    token: `mock-jwt-new`,
     avatarUrl: `https://i.pravatar.cc/150?u=${Date.now()}`,
     qualificationUrls: userData.qualificationUrls
   };
@@ -168,6 +167,9 @@ export const register = async (userData: Partial<User>, password: string): Promi
   if (newUser.role === UserRole.MERCHANT) {
       notifyAdmins('New Merchant Registered', `User ${newUser.username} has applied for a merchant account.`, 'warning');
   }
+
+  // BACKEND LOGIC: Auto-login after registration
+  establishSession(newUser);
 
   return { success: true, data: newUser };
 };
@@ -186,6 +188,12 @@ export const updateUser = async (id: string, updates: Partial<User>): Promise<Ap
   const updatedUser = { ...users[index], ...updates };
   users[index] = updatedUser;
   setStorage('mock_users', users);
+
+  // BACKEND LOGIC: If updated user is current session user, update session too
+  if (session.id === id) {
+      establishSession(updatedUser);
+  }
+
   return { success: true, data: updatedUser };
 };
 
@@ -215,7 +223,6 @@ export const getAttractions = async (filters: any = {}): Promise<ApiResponse<Att
   let data = getStorage<Attraction[]>('mock_attractions', MOCK_ATTRACTIONS);
   const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
   
-  // Publicly only show active ones unless user is Admin
   const session = getAuthSession();
   if (!session || session.role !== UserRole.ADMIN) {
       data = data.filter(a => a.status === 'active');
@@ -250,8 +257,6 @@ export const createAttraction = async (attractionData: Partial<Attraction>): Pro
   if (!session) return { success: false, message: 'Please login to suggest attractions.' };
 
   const attractions = getStorage<Attraction[]>('mock_attractions', MOCK_ATTRACTIONS);
-  
-  // Normal users suggest as 'pending', Admins can create 'active' directly
   const status = session.role === UserRole.ADMIN ? (attractionData.status || 'active') : 'pending';
 
   const newAttraction: Attraction = {
@@ -299,7 +304,6 @@ export const getPosts = async (attractionId?: string): Promise<ApiResponse<Post[
   await delay(DELAY_MS);
   const allPosts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
   
-  // Publicly only show active
   const session = getAuthSession();
   let visiblePosts = allPosts;
   if (!session || session.role !== UserRole.ADMIN) {
@@ -335,7 +339,6 @@ export const updatePost = async (id: string, updates: Partial<Post>): Promise<Ap
   const index = posts.findIndex(p => p.id === id);
   if (index === -1) return { success: false, message: 'Post not found' };
   
-  // Only owner or Admin can update
   if (posts[index].userId !== session.id && session.role !== UserRole.ADMIN) {
       return { success: false, message: 'Forbidden' };
   }
@@ -410,7 +413,6 @@ export const updateProduct = async (id: string, updates: Partial<Product>): Prom
   const index = products.findIndex(p => p.id === id);
   if (index === -1) return { success: false, message: 'Not found' };
   
-  // Ensure ownership
   if (products[index].merchantId !== session.id && session.role !== UserRole.ADMIN) {
       return { success: false, message: 'Forbidden' };
   }
@@ -517,7 +519,6 @@ export const getOrders = async (userId?: string, merchantId?: string): Promise<A
 
   let orders = getStorage<Order[]>('mock_orders', []);
   
-  // Security filter: If not admin, you only see what belongs to you
   if (session.role !== UserRole.ADMIN) {
       if (userId) orders = orders.filter(o => o.userId === session.id);
       if (merchantId) orders = orders.filter(o => o.items.some(i => i.merchantId === session.id));
@@ -537,7 +538,6 @@ export const updateOrderStatus = async (orderId: string, status: Order['status']
   const index = orders.findIndex(o => o.id === orderId);
   if (index === -1) return { success: false, message: 'Order not found' };
   
-  // Only merchant of at least one item or Admin can update status
   const isMerchant = orders[index].items.some(i => i.merchantId === session.id);
   if (!isMerchant && session.role !== UserRole.ADMIN) {
       return { success: false, message: 'Forbidden' };

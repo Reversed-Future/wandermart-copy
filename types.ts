@@ -1,3 +1,5 @@
+export const AUTH_SESSION_KEY = 'wander_mart_session';
+
 export enum UserRole {
   GUEST = 'guest',
   TRAVELER = 'traveler',
@@ -29,8 +31,8 @@ export interface Attraction {
   city?: string;
   county?: string;
   tags: string[];
-  imageUrl: string; // Used as cover image
-  imageUrls?: string[]; // All images including cover
+  imageUrl: string; 
+  imageUrls?: string[]; 
   openHours?: string;
   drivingTips?: string;
   travelerTips?: string;
