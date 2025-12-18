@@ -12,12 +12,11 @@ export interface User {
   role: UserRole;
   token?: string;
   status: 'active' | 'pending' | 'rejected';
-  qualificationUrl?: string;
   qualificationUrls?: string[];
   avatarUrl?: string;
   address?: string;
-  phone?: string;    // New: User contact phone
-  realName?: string; // New: User real name for shipping
+  phone?: string;
+  realName?: string;
 }
 
 export interface Attraction {
@@ -30,9 +29,8 @@ export interface Attraction {
   city?: string;
   county?: string;
   tags: string[];
-  imageUrl: string;
-  imageUrls?: string[];
-  gallery?: string[];
+  imageUrl: string; // Used as cover image
+  imageUrls?: string[]; // All images including cover
   openHours?: string;
   drivingTips?: string;
   travelerTips?: string;
@@ -50,7 +48,6 @@ export interface Post {
   username: string;
   content: string;
   rating?: number;
-  imageUrl?: string;
   imageUrls?: string[];
   likes: number;
   comments: Comment[];
@@ -92,8 +89,8 @@ export interface Order {
   status: 'pending' | 'shipped' | 'delivered' | 'cancelled';
   trackingNumber?: string;
   address: string;
-  phone: string;    // New: Shipping phone
-  realName: string; // New: Shipping recipient name
+  phone: string;
+  realName: string;
   createdAt: string;
 }
 

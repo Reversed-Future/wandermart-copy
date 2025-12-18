@@ -23,7 +23,6 @@ export const AttractionDetail = () => {
   const [newPostImages, setNewPostImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Edit Review State
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [editRating, setEditRating] = useState(0);
@@ -55,7 +54,11 @@ export const AttractionDetail = () => {
       username: user.username,
       content: newPostContent,
       rating: newRating,
-      imageUrls: newPostImages
+      imageUrls: newPostImages,
+      likes: 0,
+      comments: [],
+      createdAt: new Date().toISOString(),
+      status: 'active'
     });
 
     if (res.success && res.data) {
@@ -80,7 +83,7 @@ export const AttractionDetail = () => {
     setEditingPostId(post.id);
     setEditContent(post.content);
     setEditRating(post.rating || 0);
-    setEditImages(post.imageUrls || (post.imageUrl ? [post.imageUrl] : []));
+    setEditImages(post.imageUrls || []);
   };
 
   const cancelEdit = () => {
@@ -119,7 +122,7 @@ export const AttractionDetail = () => {
 
   const allImages = attraction.imageUrls && attraction.imageUrls.length > 0 
       ? attraction.imageUrls 
-      : [attraction.imageUrl, ...(attraction.gallery || [])];
+      : [attraction.imageUrl];
 
   const handlePrevImage = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -208,7 +211,6 @@ export const AttractionDetail = () => {
           </Card>
         </div>
 
-        {/* Featured Products Section */}
         {products.length > 0 && (
           <div>
             <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
@@ -239,7 +241,6 @@ export const AttractionDetail = () => {
           </div>
         )}
 
-        {/* Community Section */}
         <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
           <h2 className="text-xl font-bold mb-4">Community Reviews</h2>
           
@@ -323,7 +324,6 @@ export const AttractionDetail = () => {
                       ))}
                     </div>
                   )}
-                  {!post.imageUrls && post.imageUrl && <img src={post.imageUrl} alt="User upload" className="mt-3 w-48 h-48 object-cover rounded-lg border border-gray-100" />}
                 </div>
               );
             })}

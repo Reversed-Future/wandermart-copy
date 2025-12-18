@@ -35,7 +35,6 @@ const MOCK_ATTRACTIONS: Attraction[] = [
     tags: ['Nature', 'Animals', 'Family'],
     imageUrl: 'https://picsum.photos/800/600?random=1',
     imageUrls: ['https://picsum.photos/800/600?random=1', 'https://picsum.photos/800/600?random=101', 'https://picsum.photos/800/600?random=102'],
-    gallery: ['https://picsum.photos/800/600?random=101', 'https://picsum.photos/800/600?random=102', 'https://picsum.photos/800/600?random=103'],
     openHours: '07:30 - 18:00',
     drivingTips: 'Accessible by Metro Line 3. Parking available at South Gate.',
     travelerTips: 'Arrive early in the morning (before 9 AM) to see active pandas during feeding time.',
@@ -53,7 +52,6 @@ const MOCK_ATTRACTIONS: Attraction[] = [
     tags: ['History', 'Culture', 'Architecture'],
     imageUrl: 'https://picsum.photos/800/600?random=2',
     imageUrls: ['https://picsum.photos/800/600?random=2', 'https://picsum.photos/800/600?random=201'],
-    gallery: ['https://picsum.photos/800/600?random=201', 'https://picsum.photos/800/600?random=202'],
     openHours: '08:30 - 17:00',
     drivingTips: 'No public parking. Use public transport (Metro Line 1).',
     travelerTips: 'Tickets must be booked online at least 7 days in advance. Closed on Mondays.',
@@ -71,7 +69,6 @@ const MOCK_ATTRACTIONS: Attraction[] = [
     tags: ['Nature', 'History', 'Water'],
     imageUrl: 'https://picsum.photos/800/600?random=3',
     imageUrls: ['https://picsum.photos/800/600?random=3', 'https://picsum.photos/800/600?random=301'],
-    gallery: ['https://picsum.photos/800/600?random=301'],
     openHours: '24 Hours',
     drivingTips: 'Traffic restrictions on weekends based on license plates.',
     travelerTips: 'Best viewed by boat. Sunset at Leifeng Pagoda is spectacular.',
@@ -90,7 +87,8 @@ const MOCK_POSTS: Post[] = [
       likes: 12,
       comments: [],
       createdAt: new Date().toISOString(),
-      status: 'active'
+      status: 'active',
+      imageUrls: ['https://picsum.photos/800/600?random=501']
     }
 ];
 
@@ -112,7 +110,7 @@ const MOCK_PRODUCTS: Product[] = [
 
 const INITIAL_USERS: User[] = [
   { id: 'admin1', username: 'Admin User', email: 'admin@test.com', role: UserRole.ADMIN, status: 'active', avatarUrl: 'https://i.pravatar.cc/150?u=admin' },
-  { id: 'm1', username: 'Merchant User', email: 'merchant@test.com', role: UserRole.MERCHANT, status: 'active', qualificationUrl: 'https://picsum.photos/200/300', qualificationUrls: ['https://picsum.photos/200/300'], avatarUrl: 'https://i.pravatar.cc/150?u=merchant' },
+  { id: 'm1', username: 'Merchant User', email: 'merchant@test.com', role: UserRole.MERCHANT, status: 'active', qualificationUrls: ['https://picsum.photos/200/300'], avatarUrl: 'https://i.pravatar.cc/150?u=merchant' },
   { id: 'u1', username: 'Traveler User', email: 'user@test.com', role: UserRole.TRAVELER, status: 'active', avatarUrl: 'https://i.pravatar.cc/150?u=traveler' },
 ];
 
@@ -130,7 +128,6 @@ const createNotification = (userId: string, title: string, content: string, type
   setStorage('mock_notifications', [newMsg, ...msgs]);
 };
 
-// Helper to notify all admins
 const notifyAdmins = (title: string, content: string, type: NotificationMessage['type'] = 'info') => {
     const users = getStorage<User[]>('mock_users', INITIAL_USERS);
     const admins = users.filter(u => u.role === UserRole.ADMIN);
@@ -163,7 +160,6 @@ export const register = async (userData: Partial<User>, password: string): Promi
   };
   setStorage('mock_users', [...users, newUser]);
 
-  // Notify admin if a merchant registered
   if (newUser.role === UserRole.MERCHANT) {
       notifyAdmins('New Merchant Registered', `User ${newUser.username} has applied for a merchant account.`, 'warning');
   }
@@ -234,7 +230,6 @@ export const createAttraction = async (attractionData: Partial<Attraction>): Pro
   };
   setStorage('mock_attractions', [newAttraction, ...attractions]);
 
-  // Notify admin if a pending attraction was suggested
   if (newAttraction.status === 'pending') {
       notifyAdmins('New Attraction Suggested', `"${newAttraction.title}" has been suggested and needs review.`, 'info');
   }
@@ -306,8 +301,6 @@ export const reportPost = async (postId: string, reporterId?: string): Promise<A
   if (index !== -1) {
       const updated = posts.map(p => p.id === postId ? { ...p, status: 'reported' as const } : p);
       setStorage('mock_posts', updated);
-      
-      // Notify admin of reported content
       notifyAdmins('Content Reported', `A review for attraction ID ${posts[index].attractionId} has been reported.`, 'error');
   }
   return { success: true, data: true };
@@ -355,7 +348,6 @@ export const deleteProduct = async (id: string): Promise<ApiResponse<boolean>> =
 
 export const createOrder = async (orderData: Partial<Order>): Promise<ApiResponse<Order>> => {
   await delay(DELAY_MS);
-  // Formal Order ID generation: WM-YYMMDD-RANDOM
   const now = new Date();
   const dateStr = now.toISOString().slice(2,10).replace(/-/g, '');
   const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
