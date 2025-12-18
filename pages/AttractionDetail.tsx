@@ -28,6 +28,9 @@ export const AttractionDetail = () => {
   const [editRating, setEditRating] = useState(0);
   const [editImages, setEditImages] = useState<string[]>([]);
 
+  // State to track liked posts in the current session
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     if (id) {
       Promise.all([
@@ -56,7 +59,6 @@ export const AttractionDetail = () => {
       rating: newRating,
       imageUrls: newPostImages,
       likes: 0,
-      comments: [],
       createdAt: new Date().toISOString(),
       status: 'active'
     });
@@ -69,6 +71,26 @@ export const AttractionDetail = () => {
       notify("Review posted successfully!", "success");
     }
     setIsSubmitting(false);
+  };
+
+  const handleLike = async (postId: string) => {
+      if (!user) {
+          notify("Please login to like reviews.", "info");
+          return;
+      }
+      
+      const hasLiked = likedPostIds.has(postId);
+      const res = await API.toggleLikePost(postId, !hasLiked);
+      
+      if (res.success && typeof res.data === 'number') {
+          setPosts(posts.map(p => p.id === postId ? { ...p, likes: res.data as number } : p));
+          setLikedPostIds(prev => {
+              const next = new Set(prev);
+              if (hasLiked) next.delete(postId);
+              else next.add(postId);
+              return next;
+          });
+      }
   };
 
   const handleReport = (postId: string) => {
@@ -117,8 +139,8 @@ export const AttractionDetail = () => {
       });
   };
 
-  if (loading) return <div>Loading...</div>;
-  if (!attraction) return <div>Not found</div>;
+  if (loading) return <div className="text-center py-20"><Icons.Loader /> Loading...</div>;
+  if (!attraction) return <div className="text-center py-20 text-gray-500">Attraction not found</div>;
 
   const allImages = attraction.imageUrls && attraction.imageUrls.length > 0 
       ? attraction.imageUrls 
@@ -138,7 +160,7 @@ export const AttractionDetail = () => {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 space-y-8">
         <div>
-          <div className="relative group mb-6 rounded-xl overflow-hidden shadow-sm">
+          <div className="relative group mb-6 rounded-xl overflow-hidden shadow-sm border border-gray-100">
              <img src={allImages[activeImageIndex]} alt={attraction.title} className="w-full h-80 object-cover" />
              
              {allImages.length > 1 && (
@@ -229,7 +251,7 @@ export const AttractionDetail = () => {
                           <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
                        </div>
                        <div className="flex justify-between items-center mt-2">
-                          <span className="font-bold text-blue-600">${product.price}</span>
+                          <span className="font-bold text-blue-600">${product.price.toFixed(2)}</span>
                           {user?.role !== UserRole.MERCHANT && (
                             <Button onClick={() => addToCart(product, 1)} variant="secondary" className="px-2 py-1 text-xs">Add</Button>
                           )}
@@ -245,7 +267,7 @@ export const AttractionDetail = () => {
           <h2 className="text-xl font-bold mb-4">Community Reviews</h2>
           
           {user ? (
-            <div className="mb-6 bg-gray-50 p-4 rounded-lg space-y-3">
+            <div className="mb-6 bg-gray-50 p-4 rounded-lg space-y-3 border border-gray-200">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Your Rating:</span>
                 <StarRating rating={newRating} onRatingChange={setNewRating} />
@@ -270,9 +292,10 @@ export const AttractionDetail = () => {
           )}
 
           <div className="space-y-6">
-            {posts.length === 0 && <p className="text-gray-500 italic">No reviews yet.</p>}
+            {posts.length === 0 && <p className="text-gray-500 italic text-center py-6">No reviews yet. Be the first to share!</p>}
             {posts.map(post => {
               const isOwner = user?.id === post.userId;
+              const hasLiked = likedPostIds.has(post.id);
               
               if (editingPostId === post.id) {
                 return (
@@ -293,10 +316,10 @@ export const AttractionDetail = () => {
               }
 
               return (
-                <div key={post.id} className="border-b border-gray-100 last:border-0 pb-6">
+                <div key={post.id} className="border-b border-gray-100 last:border-0 pb-6 group">
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-2">
-                      <div className="bg-blue-100 p-1 rounded-full"><Icons.User /></div>
+                      <div className="bg-blue-100 p-2 rounded-full text-blue-600"><Icons.User /></div>
                       <div>
                         <div className="font-medium text-sm flex items-center gap-2">
                           {post.username}
@@ -312,7 +335,7 @@ export const AttractionDetail = () => {
                           <button onClick={() => handleDeletePost(post.id)} className="text-red-500 hover:underline font-medium">Delete</button>
                         </>
                       ) : (
-                        user && <button onClick={() => handleReport(post.id)} className="text-gray-400 hover:text-red-500 underline">Report</button>
+                        user && <button onClick={() => handleReport(post.id)} className="text-gray-400 hover:text-red-500 underline transition-colors">Report</button>
                       )}
                     </div>
                   </div>
@@ -320,10 +343,20 @@ export const AttractionDetail = () => {
                   {post.imageUrls && post.imageUrls.length > 0 && (
                     <div className="mt-3 flex gap-2 flex-wrap">
                       {post.imageUrls.map((url, idx) => (
-                        <img key={idx} src={url} alt="User upload" className="w-24 h-24 object-cover rounded-lg border border-gray-100 cursor-pointer hover:opacity-90" />
+                        <img key={idx} src={url} alt="User upload" className="w-24 h-24 object-cover rounded-lg border border-gray-100 cursor-pointer hover:opacity-90 transition-opacity" />
                       ))}
                     </div>
                   )}
+                  
+                  <div className="mt-3 flex items-center gap-4">
+                      <button 
+                        onClick={() => handleLike(post.id)}
+                        className={`flex items-center gap-1 text-sm font-medium transition-colors ${hasLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
+                      >
+                          <Icons.Heart filled={hasLiked} />
+                          <span>{post.likes || 0}</span>
+                      </button>
+                  </div>
                 </div>
               );
             })}
@@ -334,7 +367,7 @@ export const AttractionDetail = () => {
       <div className="space-y-6">
         <Card className="p-4 bg-yellow-50 border-yellow-100">
            <h3 className="font-bold text-yellow-800 mb-2">Traveler Tips</h3>
-           <p className="text-sm text-yellow-700">{attraction.travelerTips || 'Always check weather conditions before visiting natural attractions. Stay safe!'}</p>
+           <p className="text-sm text-yellow-700 leading-relaxed">{attraction.travelerTips || 'Always check weather conditions before visiting natural attractions. Stay safe and enjoy your journey!'}</p>
         </Card>
       </div>
     </div>

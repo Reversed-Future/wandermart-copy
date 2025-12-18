@@ -50,17 +50,8 @@ export interface Post {
   rating?: number;
   imageUrls?: string[];
   likes: number;
-  comments: Comment[];
   createdAt: string;
   status: 'active' | 'reported' | 'hidden';
-}
-
-export interface Comment {
-  id: string;
-  userId: string;
-  username: string;
-  content: string;
-  createdAt: string;
 }
 
 export interface Product {

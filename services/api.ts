@@ -85,7 +85,6 @@ const MOCK_POSTS: Post[] = [
       content: 'Absolutely breathtaking views!',
       rating: 5,
       likes: 12,
-      comments: [],
       createdAt: new Date().toISOString(),
       status: 'active',
       imageUrls: ['https://picsum.photos/800/600?random=501']
@@ -267,7 +266,6 @@ export const createPost = async (postData: Partial<Post>): Promise<ApiResponse<P
     ...postData as Post,
     id: `post-${Date.now()}`,
     likes: 0,
-    comments: [],
     createdAt: new Date().toISOString(),
     status: 'active'
   };
@@ -292,6 +290,18 @@ export const deletePost = async (id: string): Promise<ApiResponse<boolean>> => {
   let posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
   setStorage('mock_posts', posts.filter(p => p.id !== id));
   return { success: true, data: true };
+};
+
+export const toggleLikePost = async (postId: string, increment: boolean): Promise<ApiResponse<number>> => {
+    await delay(100);
+    const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
+    const index = posts.findIndex(p => p.id === postId);
+    if (index !== -1) {
+        posts[index].likes = Math.max(0, posts[index].likes + (increment ? 1 : -1));
+        setStorage('mock_posts', posts);
+        return { success: true, data: posts[index].likes };
+    }
+    return { success: false, message: 'Post not found' };
 };
 
 export const reportPost = async (postId: string, reporterId?: string): Promise<ApiResponse<boolean>> => {

@@ -16,7 +16,12 @@ export const Icons = {
   ChevronLeft: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>,
   ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>,
   Bell: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>,
-  CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+  CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>,
+  Heart: ({ filled = false, className = "" }: { filled?: boolean, className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l8.84-8.84 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+    </svg>
+  )
 };
 
 // --- COMPONENTS ---
@@ -157,7 +162,6 @@ interface ImageUploaderProps {
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({ images, onChange, maxCount = 10, label = "Upload Images" }) => {
   const [loadingItems, setLoadingItems] = useState<{ id: string, preview: string }[]>([]);
-  // We use a ref to access the latest 'images' prop inside the async upload loop without closure staleness issues
   const imagesRef = useRef(images);
   
   useEffect(() => {
@@ -167,14 +171,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ images, onChange, 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files) as File[];
-    e.target.value = ''; // Reset input to allow re-selecting same files
+    e.target.value = ''; 
 
     if (images.length + files.length > maxCount) {
       alert(`You can only upload up to ${maxCount} images.`);
       return;
     }
 
-    // 1. Create temporary placeholders
     const newItems = files.map(f => ({
       id: Math.random().toString(36).substr(2, 9),
       preview: URL.createObjectURL(f),
@@ -183,22 +186,12 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ images, onChange, 
 
     setLoadingItems(prev => [...prev, ...newItems.map(i => ({ id: i.id, preview: i.preview }))]);
 
-    // 2. Upload one by one
     for (const item of newItems) {
       try {
         const url = await API.uploadFile(item.file);
-        // Append to current list via callback to ensure we don't lose updates
-        // However, since we are in a loop, we should use the ref to get the base for the *next* update 
-        // OR simpler: just update the parent state one by one.
-        // We call onChange with [ ...latestImagesFromRef, newUrl ]
-        
         const currentList = imagesRef.current;
         const newList = [...currentList, url];
         onChange(newList);
-        
-        // Ref updates via useEffect, but might lag slightly if onChange triggers re-render fast.
-        // To be safe in this loop, we locally track the 'accumulated' list or just trust React's state speed + ref sync.
-        // Since API mock has delay, ref sync should be fine.
       } catch (err) {
         console.error("Upload failed", err);
       } finally {
@@ -215,7 +208,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ images, onChange, 
     <div className="mb-4">
       {label && <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>}
       <div className="flex flex-wrap gap-3">
-        {/* Existing Images */}
         {images.map((url, idx) => (
           <div key={`${url}-${idx}`} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200 group">
             <img src={url} alt="Uploaded" className="w-full h-full object-cover" />
@@ -228,7 +220,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ images, onChange, 
           </div>
         ))}
 
-        {/* Loading Placeholders */}
         {loadingItems.map((item) => (
           <div key={item.id} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200 flex items-center justify-center bg-gray-50">
             <img src={item.preview} alt="Uploading" className="w-full h-full object-cover opacity-50" />
@@ -238,7 +229,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ images, onChange, 
           </div>
         ))}
 
-        {/* Upload Button */}
         {images.length + loadingItems.length < maxCount && (
           <label className="w-24 h-24 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors text-gray-400 hover:text-blue-500">
             <Icons.Camera />
