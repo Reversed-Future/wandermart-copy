@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Badge } from '../components/ui';
+import { Card, Badge, Icons } from '../components/ui';
 import * as API from '../services/api';
 import { Order } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,6 +22,15 @@ export const UserOrders = () => {
               <span className="font-bold">Order #{o.id}</span>
               <Badge>{o.status}</Badge>
             </div>
+            
+            <div className="my-3 flex items-start gap-2 text-xs text-gray-600">
+                <Icons.MapPin />
+                <div>
+                    <span className="font-semibold">Shipped to:</span>
+                    <p>{o.address}</p>
+                </div>
+            </div>
+
             <div className="space-y-1">
               {o.items.map((item, idx) => (
                 <div key={idx} className="flex justify-between text-sm">

@@ -1,4 +1,3 @@
-
 export enum UserRole {
   GUEST = 'guest',
   TRAVELER = 'traveler',
@@ -12,10 +11,13 @@ export interface User {
   email: string;
   role: UserRole;
   token?: string;
-  status: 'active' | 'pending' | 'rejected'; // Account status
-  qualificationUrl?: string; // Kept for backward compat
-  qualificationUrls?: string[]; // New: multiple pages
-  avatarUrl?: string; // New: User profile picture
+  status: 'active' | 'pending' | 'rejected';
+  qualificationUrl?: string;
+  qualificationUrls?: string[];
+  avatarUrl?: string;
+  address?: string;
+  phone?: string;    // New: User contact phone
+  realName?: string; // New: User real name for shipping
 }
 
 export interface Attraction {
@@ -23,22 +25,22 @@ export interface Attraction {
   title: string;
   description: string;
   address: string;
-  region: string; // Keep for display formatted string
+  region: string;
   province?: string;
   city?: string;
   county?: string;
   tags: string[];
-  imageUrl: string; // Primary cover image
-  imageUrls?: string[]; // All images including cover
-  gallery?: string[]; // Legacy field, mapped to imageUrls slice(1)
+  imageUrl: string;
+  imageUrls?: string[];
+  gallery?: string[];
   openHours?: string;
   drivingTips?: string;
-  travelerTips?: string; // New field for general advice
-  status: 'active' | 'pending' | 'rejected'; // New field for approval workflow
-  submittedBy?: string; // New field to track who uploaded it
-  submittedById?: string; // ID of the user who submitted it
-  averageRating?: number; // Calculated field
-  reviewCount?: number; // Calculated field
+  travelerTips?: string;
+  status: 'active' | 'pending' | 'rejected';
+  submittedBy?: string;
+  submittedById?: string;
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 export interface Post {
@@ -47,9 +49,9 @@ export interface Post {
   userId: string;
   username: string;
   content: string;
-  rating?: number; // 1-5 star rating
-  imageUrl?: string; // Legacy single image
-  imageUrls?: string[]; // New: multiple images
+  rating?: number;
+  imageUrl?: string;
+  imageUrls?: string[];
   likes: number;
   comments: Comment[];
   createdAt: string;
@@ -68,14 +70,14 @@ export interface Product {
   id: string;
   merchantId: string;
   merchantName: string;
-  attractionId?: string; // Associated map location/attraction
-  attractionName?: string; // Denormalized for display
+  attractionId?: string;
+  attractionName?: string;
   name: string;
   description: string;
   price: number;
   stock: number;
-  imageUrl: string; // Primary
-  imageUrls?: string[]; // Multiple
+  imageUrl: string;
+  imageUrls?: string[];
 }
 
 export interface CartItem extends Product {
@@ -89,8 +91,11 @@ export interface Order {
   total: number;
   status: 'pending' | 'shipped' | 'delivered' | 'cancelled';
   trackingNumber?: string;
+  address: string;
+  phone: string;    // New: Shipping phone
+  realName: string; // New: Shipping recipient name
   createdAt: string;
-  }
+}
 
 export interface NotificationMessage {
   id: string;
@@ -98,7 +103,7 @@ export interface NotificationMessage {
   title: string;
   content: string;
   isRead: boolean;
-  type: 'info' | 'success' | 'warning' | 'error'; // For icon/color
+  type: 'info' | 'success' | 'warning' | 'error';
   createdAt: string;
 }
 
