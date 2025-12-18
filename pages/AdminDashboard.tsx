@@ -24,23 +24,47 @@ export const AdminDashboard = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingImages, setEditingImages] = useState<string[]>([]);
 
+  const refreshData = async () => {
+      const [repRes, mercRes, attrRes, pendAttrRes] = await Promise.all([
+          API.getReportedContent(),
+          API.getPendingMerchants(),
+          API.getAttractions({}),
+          API.getPendingAttractions()
+      ]);
+
+      if (repRes.data) setReports(repRes.data);
+      if (mercRes.data) setPendingMerchants(mercRes.data);
+      if (attrRes.data) setAttractions(attrRes.data);
+      if (pendAttrRes.data) setPendingAttractions(pendAttrRes.data);
+
+      // Simple alert if unauthorized access (mock server guard)
+      if (repRes.success === false && repRes.message?.includes('Forbidden')) {
+          notify("Access denied: You are not authorized for administrative tasks.", "error");
+      }
+  };
+
   useEffect(() => {
-    API.getReportedContent().then(res => res.data && setReports(res.data));
-    API.getPendingMerchants().then(res => res.data && setPendingMerchants(res.data));
-    API.getAttractions({}).then(res => res.data && setAttractions(res.data));
-    API.getPendingAttractions().then(res => res.data && setPendingAttractions(res.data));
+    refreshData();
   }, []);
 
   const handleModeration = async (id: string, action: 'approve' | 'delete') => {
-    await API.moderateContent(id, action);
-    setReports(reports.filter(r => r.id !== id));
-    notify(action === 'delete' ? "Post deleted" : "Post approved", "success");
+    const res = await API.moderateContent(id, action);
+    if (res.success) {
+        setReports(reports.filter(r => r.id !== id));
+        notify(action === 'delete' ? "Post deleted" : "Post approved", "success");
+    } else {
+        notify(res.message || "Action failed", "error");
+    }
   };
 
   const handleMerchantApproval = async (id: string, status: 'active' | 'rejected') => {
-      await API.updateUserStatus(id, status);
-      setPendingMerchants(pendingMerchants.filter(u => u.id !== id));
-      notify(`User ${status === 'active' ? 'Approved' : 'Rejected'}`, status === 'active' ? "success" : "info");
+      const res = await API.updateUserStatus(id, status);
+      if (res.success) {
+          setPendingMerchants(pendingMerchants.filter(u => u.id !== id));
+          notify(`User ${status === 'active' ? 'Approved' : 'Rejected'}`, status === 'active' ? "success" : "info");
+      } else {
+          notify(res.message || "Action failed", "error");
+      }
   };
 
   const handleAttractionApproval = async (id: string, action: 'approve' | 'reject') => {
@@ -50,16 +74,21 @@ export const AdminDashboard = () => {
               setPendingAttractions(pendingAttractions.filter(a => a.id !== id));
               setAttractions([...attractions, res.data]);
               notify("Attraction approved and published", "success");
+          } else {
+              notify(res.message || "Failed to approve", "error");
           }
       } else {
           confirm("Reject this attraction submission? It will be deleted.", async () => {
-              await API.deleteAttraction(id);
-              setPendingAttractions(pendingAttractions.filter(a => a.id !== id));
-              notify("Submission rejected", "info");
+              const res = await API.deleteAttraction(id);
+              if (res.success) {
+                  setPendingAttractions(pendingAttractions.filter(a => a.id !== id));
+                  notify("Submission rejected", "info");
+              } else {
+                  notify(res.message || "Failed to delete", "error");
+              }
           });
       }
       
-      // Close edit form if it matches the item being acted upon
       if (editingAttr?.id === id) {
           setIsEditing(false);
           setEditingAttr(null);
@@ -71,55 +100,44 @@ export const AdminDashboard = () => {
       if (!editingAttr) return;
       
       if (!editingAttr.title || !editingAttr.description || !editingAttr.province || !editingAttr.city || !editingAttr.county) {
-          notify("Please fill in all required fields (Title, Description, Province, City, County).", "error");
+          notify("Please fill in all required fields.", "error");
           return;
       }
 
       const payload = { 
           ...editingAttr, 
-          imageUrl: editingImages.length > 0 ? editingImages[0] : (editingAttr.imageUrl || ''), // Ensure cover is set
+          imageUrl: editingImages.length > 0 ? editingImages[0] : (editingAttr.imageUrl || ''),
           imageUrls: editingImages 
       };
-      if (targetStatus) {
-          payload.status = targetStatus;
+      if (targetStatus) payload.status = targetStatus;
+
+      let res;
+      if (editingAttr.id) {
+          res = await API.updateAttraction(editingAttr.id, payload);
+      } else {
+          res = await API.createAttraction(payload);
       }
 
-      if (editingAttr.id) {
-          // Update
-          const res = await API.updateAttraction(editingAttr.id, payload);
-          if (res.success && res.data) {
-              const updated = res.data;
-              
-              // If it was pending and is now active (approved)
-              if (editingAttr.status === 'pending' && updated.status === 'active') {
-                   setPendingAttractions(pendingAttractions.filter(a => a.id !== updated.id));
-                   setAttractions([updated, ...attractions]);
-              } else if (updated.status === 'pending') {
-                   // Still pending, just update the pending list info
-                   setPendingAttractions(pendingAttractions.map(a => a.id === updated.id ? updated : a));
-              } else {
-                   // Already active, just update list
-                   setAttractions(attractions.map(a => a.id === updated.id ? updated : a));
-              }
-          }
+      if (res.success) {
+          notify("Attraction saved successfully", "success");
+          setIsEditing(false);
+          setEditingAttr(null);
+          setEditingImages([]);
+          refreshData();
       } else {
-          // Create
-          const res = await API.createAttraction(payload);
-          if (res.success && res.data) {
-              setAttractions([res.data!, ...attractions]);
-          }
+          notify(res.message || "Save failed", "error");
       }
-      setIsEditing(false);
-      setEditingAttr(null);
-      setEditingImages([]);
-      notify(targetStatus === 'active' ? "Attraction saved and published!" : "Attraction saved successfully", "success");
   };
 
   const handleDeleteAttraction = (id: string) => {
       confirm("Are you sure? This cannot be undone.", async () => {
-          await API.deleteAttraction(id);
-          setAttractions(attractions.filter(a => a.id !== id));
-          notify("Attraction deleted", "info");
+          const res = await API.deleteAttraction(id);
+          if (res.success) {
+            setAttractions(attractions.filter(a => a.id !== id));
+            notify("Attraction deleted", "info");
+          } else {
+            notify(res.message || "Delete failed", "error");
+          }
       });
   };
 
@@ -127,30 +145,9 @@ export const AdminDashboard = () => {
       setEditingAttr(attr || { title: '', description: '', address: '', province: '', city: '', county: '', tags: [], openHours: '', drivingTips: '', travelerTips: '' });
       setEditingImages(attr?.imageUrls || (attr?.imageUrl ? [attr.imageUrl] : []));
       setIsEditing(true);
-      
-      // Scroll to form slightly
       setTimeout(() => {
           document.getElementById('edit-form-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
-  };
-
-  const handleEditProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      if (!editingAttr) return;
-      setEditingAttr({
-          ...editingAttr, 
-          province: e.target.value,
-          city: '',
-          county: ''
-      });
-  };
-
-  const handleEditCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      if (!editingAttr) return;
-      setEditingAttr({
-          ...editingAttr, 
-          city: e.target.value,
-          county: ''
-      });
   };
 
   return (
@@ -185,7 +182,7 @@ export const AdminDashboard = () => {
       </div>
 
       {activeTab === 'content' && (
-        <div>
+        <div className="animate-fade-in">
           {reports.length === 0 ? <Alert type="success">All caught up! No reported content.</Alert> : (
             <div className="space-y-4">
               {reports.map(post => (
@@ -214,7 +211,7 @@ export const AdminDashboard = () => {
       )}
 
       {activeTab === 'users' && (
-          <div>
+          <div className="animate-fade-in">
               {pendingMerchants.length === 0 ? <Alert type="success">No pending merchant applications.</Alert> : (
                   <div className="grid gap-6">
                       {pendingMerchants.map(user => (
@@ -248,7 +245,7 @@ export const AdminDashboard = () => {
       )}
 
       {activeTab === 'approvals' && (
-          <div>
+          <div className="animate-fade-in">
               {pendingAttractions.length === 0 ? <Alert type="success">No pending attraction submissions.</Alert> : (
                   <div className="grid grid-cols-1 gap-6">
                       {pendingAttractions.map(attr => (
@@ -261,16 +258,9 @@ export const AdminDashboard = () => {
                                   </div>
                                   <div className="text-sm text-gray-500 mb-2">{attr.province} {attr.city} {attr.county}</div>
                                   <p className="text-sm text-gray-700 mb-3">{attr.description}</p>
-                                  {attr.imageUrls && attr.imageUrls.length > 1 && (
-                                      <div className="flex gap-1 mb-3">
-                                          {attr.imageUrls.slice(1).map((u, i) => (
-                                              <img key={i} src={u} className="w-12 h-12 rounded object-cover" alt="thumb" />
-                                          ))}
-                                      </div>
-                                  )}
                                   <div className="flex flex-wrap gap-2">
-                                      <Button className="text-sm py-1" variant="secondary" onClick={() => openEdit(attr)}><Icons.Search /> Review / Edit Details</Button>
-                                      <Button className="text-sm py-1 bg-green-600 hover:bg-green-700" onClick={() => handleAttractionApproval(attr.id, 'approve')}>Approve & Publish</Button>
+                                      <Button className="text-sm py-1" variant="secondary" onClick={() => openEdit(attr)}><Icons.Search /> Review / Edit</Button>
+                                      <Button className="text-sm py-1 bg-green-600 hover:bg-green-700" onClick={() => handleAttractionApproval(attr.id, 'approve')}>Approve</Button>
                                       <Button variant="danger" className="text-sm py-1" onClick={() => handleAttractionApproval(attr.id, 'reject')}>Reject</Button>
                                   </div>
                               </div>
@@ -282,122 +272,41 @@ export const AdminDashboard = () => {
       )}
 
       {(activeTab === 'attractions' || isEditing) && (
-          <div id="edit-form-anchor">
+          <div id="edit-form-anchor" className="animate-fade-in">
               {isEditing ? (
                   <Card className="p-6 bg-gray-50 mt-6 border-2 border-blue-100">
                       <h3 className="font-bold mb-4 flex items-center gap-2 text-xl">
-                          {editingAttr?.id ? (editingAttr?.status === 'pending' ? 'Review Submission' : 'Edit Attraction') : 'New Attraction'}
-                          {editingAttr?.status === 'pending' && <Badge color="yellow">Pending</Badge>}
+                          {editingAttr?.id ? 'Edit Attraction' : 'New Attraction'}
+                          {editingAttr?.status === 'pending' && <Badge color="yellow">Pending Submission</Badge>}
                       </h3>
                       <div className="grid md:grid-cols-2 gap-4">
                           <Input label="Title *" value={editingAttr?.title} onChange={e => setEditingAttr({...editingAttr, title: e.target.value})} />
                           <Input label="Address *" value={editingAttr?.address} onChange={e => setEditingAttr({...editingAttr, address: e.target.value})} />
                           
-                          {/* Province */}
                           <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Province *</label>
-                              <select 
-                                  className="w-full border border-gray-300 rounded px-3 py-2"
-                                  value={editingAttr?.province || ''}
-                                  onChange={handleEditProvinceChange}
-                              >
+                              <select className="w-full border border-gray-300 rounded px-3 py-2" value={editingAttr?.province || ''} onChange={e => setEditingAttr({...editingAttr, province: e.target.value, city: '', county: ''})}>
                                   <option value="">Select Province</option>
                                   {Object.keys(REGION_DATA).map(p => <option key={p} value={p}>{p}</option>)}
                               </select>
                           </div>
-
-                          {/* City */}
                           <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
-                              <select 
-                                  className="w-full border border-gray-300 rounded px-3 py-2 disabled:bg-gray-100"
-                                  value={editingAttr?.city || ''}
-                                  onChange={handleEditCityChange}
-                                  disabled={!editingAttr?.province}
-                              >
+                              <select className="w-full border border-gray-300 rounded px-3 py-2" value={editingAttr?.city || ''} onChange={e => setEditingAttr({...editingAttr, city: e.target.value, county: ''})} disabled={!editingAttr?.province}>
                                   <option value="">Select City</option>
-                                  {editingAttr?.province && REGION_DATA[editingAttr.province] && Object.keys(REGION_DATA[editingAttr.province]).map(c => (
-                                      <option key={c} value={c}>{c}</option>
-                                  ))}
+                                  {editingAttr?.province && Object.keys(REGION_DATA[editingAttr.province]).map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                           </div>
-
-                          {/* County */}
-                          <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">County *</label>
-                              <select 
-                                  className="w-full border border-gray-300 rounded px-3 py-2 disabled:bg-gray-100"
-                                  value={editingAttr?.county || ''}
-                                  onChange={e => setEditingAttr({...editingAttr, county: e.target.value})}
-                                  disabled={!editingAttr?.city}
-                              >
-                                  <option value="">Select County</option>
-                                  {editingAttr?.province && editingAttr?.city && REGION_DATA[editingAttr.province][editingAttr.city] && REGION_DATA[editingAttr.province][editingAttr.city].map(c => (
-                                      <option key={c} value={c}>{c}</option>
-                                  ))}
-                              </select>
-                          </div>
-                          
                           <div className="md:col-span-2">
-                             <ImageUploader 
-                               images={editingImages}
-                               onChange={setEditingImages}
-                               label="Photos"
-                             />
+                             <ImageUploader images={editingImages} onChange={setEditingImages} label="Photos" />
                           </div>
-
-                          <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
-                            <div className="flex flex-wrap gap-2">
-                                {uniqueTags.map(t => (
-                                    <button 
-                                        key={t}
-                                        onClick={() => {
-                                            const current = editingAttr?.tags || [];
-                                            const newTags = current.includes(t) 
-                                                ? current.filter(tag => tag !== t)
-                                                : [...current, t];
-                                            setEditingAttr({...editingAttr, tags: newTags});
-                                        }}
-                                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                                            (editingAttr?.tags || []).includes(t)
-                                            ? 'bg-blue-600 text-white border-blue-600'
-                                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                                        }`}
-                                    >
-                                        {t}
-                                    </button>
-                                ))}
-                            </div>
-                          </div>
-                          
-                          <div className="md:col-span-2">
-                              <Input label="Open Hours" value={editingAttr?.openHours || ''} onChange={e => setEditingAttr({...editingAttr, openHours: e.target.value})} />
-                          </div>
-                          <div className="md:col-span-2">
-                              <Textarea label="Driving Tips" value={editingAttr?.drivingTips || ''} onChange={e => setEditingAttr({...editingAttr, drivingTips: e.target.value})} />
-                          </div>
-                          <div className="md:col-span-2">
-                              <Textarea label="Traveler Tips" value={editingAttr?.travelerTips || ''} onChange={e => setEditingAttr({...editingAttr, travelerTips: e.target.value})} />
-                          </div>
-
                           <div className="md:col-span-2">
                              <Textarea label="Description *" value={editingAttr?.description} onChange={e => setEditingAttr({...editingAttr, description: e.target.value})} />
                           </div>
                       </div>
-                      <div className="mt-6 flex gap-3 pt-4 border-t border-gray-200">
-                          <Button onClick={() => handleSaveAttraction()}>Save Changes</Button>
-                          
-                          {/* If pending, allow Save & Approve */}
-                          {editingAttr?.status === 'pending' && (
-                              <Button 
-                                className="bg-green-600 hover:bg-green-700 text-white"
-                                onClick={() => handleSaveAttraction('active')}
-                              >
-                                Save & Publish
-                              </Button>
-                          )}
-                          
+                      <div className="mt-6 flex gap-3 pt-4 border-t">
+                          <Button onClick={() => handleSaveAttraction()}>Save</Button>
+                          {editingAttr?.status === 'pending' && <Button className="bg-green-600 hover:bg-green-700" onClick={() => handleSaveAttraction('active')}>Approve & Publish</Button>}
                           <Button variant="secondary" onClick={() => setIsEditing(false)}>Cancel</Button>
                       </div>
                   </Card>
@@ -409,12 +318,12 @@ export const AdminDashboard = () => {
                       </div>
                       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {attractions.map(attr => (
-                              <Card key={attr.id} className="relative group">
+                              <Card key={attr.id} className="relative group p-0">
                                   <img src={attr.imageUrl} className="h-32 w-full object-cover" alt={attr.title} />
                                   <div className="p-4">
                                       <h3 className="font-bold">{attr.title}</h3>
-                                      <p className="text-xs text-gray-500">{attr.region}</p>
-                                      <div className="flex justify-end gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <p className="text-xs text-gray-500">{attr.province} {attr.city}</p>
+                                      <div className="flex justify-end gap-2 mt-4">
                                           <Button variant="secondary" className="px-2 py-1 text-xs" onClick={() => openEdit(attr)}>Edit</Button>
                                           <Button variant="danger" className="px-2 py-1 text-xs" onClick={() => handleDeleteAttraction(attr.id)}>Delete</Button>
                                       </div>

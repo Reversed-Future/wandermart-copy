@@ -2,6 +2,7 @@ import { Attraction, Post, Product, User, UserRole, Order, ApiResponse, Notifica
 
 const API_BASE = '/api/v1';
 const DELAY_MS = 600;
+const SESSION_KEY = 'wander_mart_session';
 
 export const getApiMode = (): 'mock' | 'real' => {
   return (localStorage.getItem('api_mode') as 'mock' | 'real') || 'mock';
@@ -21,6 +22,26 @@ const getStorage = <T>(key: string, defaultVal: T): T => {
 const setStorage = (key: string, val: any) => {
   localStorage.setItem(key, JSON.stringify(val));
 };
+
+// --- MOCK SERVER-SIDE HELPERS ---
+
+/**
+ * Simulates a server-side session check (normally via JWT).
+ * This ensures the "backend" knows who is making the request.
+ */
+const getAuthSession = (): User | null => {
+    return getStorage<User | null>(SESSION_KEY, null);
+};
+
+const ensureRole = (roles: UserRole[]): ApiResponse<any> | null => {
+    const user = getAuthSession();
+    if (!user) return { success: false, message: 'Unauthorized: Please login first.' };
+    if (!roles.includes(user.role)) return { success: false, message: 'Forbidden: Insufficient permissions.' };
+    if (user.status !== 'active' && user.role !== UserRole.ADMIN) return { success: false, message: 'Forbidden: Your account is not active.' };
+    return null;
+};
+
+// --- MOCK DATA ---
 
 const MOCK_ATTRACTIONS: Attraction[] = [
   {
@@ -56,24 +77,13 @@ const MOCK_ATTRACTIONS: Attraction[] = [
     drivingTips: 'No public parking. Use public transport (Metro Line 1).',
     travelerTips: 'Tickets must be booked online at least 7 days in advance. Closed on Mondays.',
     status: 'active'
-  },
-  {
-    id: '3',
-    title: 'West Lake Cultural Landscape',
-    description: 'Freshwater lake divided by causeways, famous for its scenic beauty and temples.',
-    address: 'Xihu District, Hangzhou, Zhejiang',
-    province: '浙江省',
-    city: '杭州市',
-    county: '西湖区',
-    region: '浙江省 杭州市',
-    tags: ['Nature', 'History', 'Water'],
-    imageUrl: 'https://picsum.photos/800/600?random=3',
-    imageUrls: ['https://picsum.photos/800/600?random=3', 'https://picsum.photos/800/600?random=301'],
-    openHours: '24 Hours',
-    drivingTips: 'Traffic restrictions on weekends based on license plates.',
-    travelerTips: 'Best viewed by boat. Sunset at Leifeng Pagoda is spectacular.',
-    status: 'active'
   }
+];
+
+const INITIAL_USERS: User[] = [
+  { id: 'admin1', username: 'Admin User', email: 'admin@test.com', role: UserRole.ADMIN, status: 'active', avatarUrl: 'https://i.pravatar.cc/150?u=admin' },
+  { id: 'm1', username: 'Merchant User', email: 'merchant@test.com', role: UserRole.MERCHANT, status: 'active', avatarUrl: 'https://i.pravatar.cc/150?u=merchant' },
+  { id: 'u1', username: 'Traveler User', email: 'user@test.com', role: UserRole.TRAVELER, status: 'active', avatarUrl: 'https://i.pravatar.cc/150?u=traveler' },
 ];
 
 const MOCK_POSTS: Post[] = [
@@ -107,11 +117,7 @@ const MOCK_PRODUCTS: Product[] = [
   }
 ];
 
-const INITIAL_USERS: User[] = [
-  { id: 'admin1', username: 'Admin User', email: 'admin@test.com', role: UserRole.ADMIN, status: 'active', avatarUrl: 'https://i.pravatar.cc/150?u=admin' },
-  { id: 'm1', username: 'Merchant User', email: 'merchant@test.com', role: UserRole.MERCHANT, status: 'active', qualificationUrls: ['https://picsum.photos/200/300'], avatarUrl: 'https://i.pravatar.cc/150?u=merchant' },
-  { id: 'u1', username: 'Traveler User', email: 'user@test.com', role: UserRole.TRAVELER, status: 'active', avatarUrl: 'https://i.pravatar.cc/150?u=traveler' },
-];
+// --- CORE API SERVICES ---
 
 const createNotification = (userId: string, title: string, content: string, type: NotificationMessage['type'] = 'info') => {
   const msgs = getStorage<NotificationMessage[]>('mock_notifications', []);
@@ -168,9 +174,15 @@ export const register = async (userData: Partial<User>, password: string): Promi
 
 export const updateUser = async (id: string, updates: Partial<User>): Promise<ApiResponse<User>> => {
   await delay(DELAY_MS);
+  const session = getAuthSession();
+  if (!session || (session.id !== id && session.role !== UserRole.ADMIN)) {
+      return { success: false, message: 'Access denied.' };
+  }
+
   const users = getStorage<User[]>('mock_users', INITIAL_USERS);
   const index = users.findIndex(u => u.id === id);
   if (index === -1) return { success: false, message: 'User not found' };
+  
   const updatedUser = { ...users[index], ...updates };
   users[index] = updatedUser;
   setStorage('mock_users', users);
@@ -178,13 +190,17 @@ export const updateUser = async (id: string, updates: Partial<User>): Promise<Ap
 };
 
 export const getPendingMerchants = async (): Promise<ApiResponse<User[]>> => {
-  await delay(DELAY_MS);
+  const guard = ensureRole([UserRole.ADMIN]);
+  if (guard) return guard;
+  
   const users = getStorage<User[]>('mock_users', INITIAL_USERS);
   return { success: true, data: users.filter(u => u.role === UserRole.MERCHANT && u.status === 'pending') };
 };
 
 export const updateUserStatus = async (userId: string, status: 'active' | 'rejected'): Promise<ApiResponse<boolean>> => {
-  await delay(DELAY_MS);
+  const guard = ensureRole([UserRole.ADMIN]);
+  if (guard) return guard;
+
   const users = getStorage<User[]>('mock_users', INITIAL_USERS);
   const updatedUsers = users.map(u => u.id === userId ? { ...u, status } : u);
   setStorage('mock_users', updatedUsers);
@@ -192,11 +208,19 @@ export const updateUserStatus = async (userId: string, status: 'active' | 'rejec
   return { success: true, data: true };
 };
 
+// --- ATTRACTIONS ---
+
 export const getAttractions = async (filters: any = {}): Promise<ApiResponse<Attraction[]>> => {
   await delay(DELAY_MS);
   let data = getStorage<Attraction[]>('mock_attractions', MOCK_ATTRACTIONS);
   const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
-  data = data.filter(a => a.status === 'active');
+  
+  // Publicly only show active ones unless user is Admin
+  const session = getAuthSession();
+  if (!session || session.role !== UserRole.ADMIN) {
+      data = data.filter(a => a.status === 'active');
+  }
+
   if (filters.province) data = data.filter(a => a.province === filters.province);
   const result = data.map(attr => {
     const attrPosts = posts.filter(p => p.attractionId === attr.id && p.status === 'active');
@@ -207,7 +231,9 @@ export const getAttractions = async (filters: any = {}): Promise<ApiResponse<Att
 };
 
 export const getPendingAttractions = async (): Promise<ApiResponse<Attraction[]>> => {
-  await delay(DELAY_MS);
+  const guard = ensureRole([UserRole.ADMIN]);
+  if (guard) return guard;
+  
   const data = getStorage<Attraction[]>('mock_attractions', MOCK_ATTRACTIONS);
   return { success: true, data: data.filter(a => a.status === 'pending') };
 };
@@ -220,51 +246,78 @@ export const getAttractionById = async (id: string): Promise<ApiResponse<Attract
 };
 
 export const createAttraction = async (attractionData: Partial<Attraction>): Promise<ApiResponse<Attraction>> => {
-  await delay(DELAY_MS);
+  const session = getAuthSession();
+  if (!session) return { success: false, message: 'Please login to suggest attractions.' };
+
   const attractions = getStorage<Attraction[]>('mock_attractions', MOCK_ATTRACTIONS);
+  
+  // Normal users suggest as 'pending', Admins can create 'active' directly
+  const status = session.role === UserRole.ADMIN ? (attractionData.status || 'active') : 'pending';
+
   const newAttraction: Attraction = {
     ...attractionData as Attraction,
     id: `attr-${Date.now()}`,
-    status: attractionData.status || 'active'
+    status: status,
+    submittedById: session.id,
+    submittedBy: session.username
   };
+  
   setStorage('mock_attractions', [newAttraction, ...attractions]);
 
   if (newAttraction.status === 'pending') {
-      notifyAdmins('New Attraction Suggested', `"${newAttraction.title}" has been suggested and needs review.`, 'info');
+      notifyAdmins('New Attraction Suggested', `"${newAttraction.title}" suggested by ${session.username}.`, 'info');
   }
 
   return { success: true, data: newAttraction };
 };
 
 export const updateAttraction = async (id: string, updates: Partial<Attraction>): Promise<ApiResponse<Attraction>> => {
-  await delay(DELAY_MS);
+  const guard = ensureRole([UserRole.ADMIN]);
+  if (guard) return guard;
+
   const attractions = getStorage<Attraction[]>('mock_attractions', MOCK_ATTRACTIONS);
   const index = attractions.findIndex(a => a.id === id);
   if (index === -1) return { success: false, message: 'Not found' };
+  
   attractions[index] = { ...attractions[index], ...updates };
   setStorage('mock_attractions', attractions);
   return { success: true, data: attractions[index] };
 };
 
 export const deleteAttraction = async (id: string): Promise<ApiResponse<boolean>> => {
-  await delay(DELAY_MS);
+  const guard = ensureRole([UserRole.ADMIN]);
+  if (guard) return guard;
+
   let attractions = getStorage<Attraction[]>('mock_attractions', MOCK_ATTRACTIONS);
   setStorage('mock_attractions', attractions.filter(a => a.id !== id));
   return { success: true, data: true };
 };
 
+// --- REVIEWS / POSTS ---
+
 export const getPosts = async (attractionId?: string): Promise<ApiResponse<Post[]>> => {
   await delay(DELAY_MS);
   const allPosts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
-  const visiblePosts = allPosts.filter(p => p.status === 'active');
+  
+  // Publicly only show active
+  const session = getAuthSession();
+  let visiblePosts = allPosts;
+  if (!session || session.role !== UserRole.ADMIN) {
+      visiblePosts = allPosts.filter(p => p.status === 'active');
+  }
+
   return { success: true, data: attractionId ? visiblePosts.filter(p => p.attractionId === attractionId) : visiblePosts };
 };
 
 export const createPost = async (postData: Partial<Post>): Promise<ApiResponse<Post>> => {
-  await delay(DELAY_MS);
+  const session = getAuthSession();
+  if (!session) return { success: false, message: 'Please login to post reviews.' };
+
   const newPost: Post = {
     ...postData as Post,
     id: `post-${Date.now()}`,
+    userId: session.id,
+    username: session.username,
     likes: 0,
     createdAt: new Date().toISOString(),
     status: 'active'
@@ -275,10 +328,18 @@ export const createPost = async (postData: Partial<Post>): Promise<ApiResponse<P
 };
 
 export const updatePost = async (id: string, updates: Partial<Post>): Promise<ApiResponse<Post>> => {
-  await delay(DELAY_MS);
+  const session = getAuthSession();
+  if (!session) return { success: false, message: 'Unauthorized' };
+
   const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
   const index = posts.findIndex(p => p.id === id);
   if (index === -1) return { success: false, message: 'Post not found' };
+  
+  // Only owner or Admin can update
+  if (posts[index].userId !== session.id && session.role !== UserRole.ADMIN) {
+      return { success: false, message: 'Forbidden' };
+  }
+
   const updatedPost = { ...posts[index], ...updates };
   posts[index] = updatedPost;
   setStorage('mock_posts', posts);
@@ -286,14 +347,25 @@ export const updatePost = async (id: string, updates: Partial<Post>): Promise<Ap
 };
 
 export const deletePost = async (id: string): Promise<ApiResponse<boolean>> => {
-  await delay(DELAY_MS);
+  const session = getAuthSession();
+  if (!session) return { success: false, message: 'Unauthorized' };
+
   let posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
+  const post = posts.find(p => p.id === id);
+  if (!post) return { success: false, message: 'Not found' };
+
+  if (post.userId !== session.id && session.role !== UserRole.ADMIN) {
+      return { success: false, message: 'Forbidden' };
+  }
+
   setStorage('mock_posts', posts.filter(p => p.id !== id));
   return { success: true, data: true };
 };
 
 export const toggleLikePost = async (postId: string, increment: boolean): Promise<ApiResponse<number>> => {
-    await delay(100);
+    const session = getAuthSession();
+    if (!session) return { success: false, message: 'Login required.' };
+
     const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
     const index = posts.findIndex(p => p.id === postId);
     if (index !== -1) {
@@ -304,17 +376,7 @@ export const toggleLikePost = async (postId: string, increment: boolean): Promis
     return { success: false, message: 'Post not found' };
 };
 
-export const reportPost = async (postId: string, reporterId?: string): Promise<ApiResponse<boolean>> => {
-  await delay(DELAY_MS);
-  const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
-  const index = posts.findIndex(p => p.id === postId);
-  if (index !== -1) {
-      const updated = posts.map(p => p.id === postId ? { ...p, status: 'reported' as const } : p);
-      setStorage('mock_posts', updated);
-      notifyAdmins('Content Reported', `A review for attraction ID ${posts[index].attractionId} has been reported.`, 'error');
-  }
-  return { success: true, data: true };
-};
+// --- PRODUCTS & COMMERCE ---
 
 export const getProducts = async (filters: any = {}): Promise<ApiResponse<Product[]>> => {
   await delay(DELAY_MS);
@@ -324,102 +386,62 @@ export const getProducts = async (filters: any = {}): Promise<ApiResponse<Produc
   return { success: true, data: allProducts };
 };
 
-export const getProductById = async (id: string): Promise<ApiResponse<Product>> => {
-  await delay(DELAY_MS);
-  const allProducts = getStorage<Product[]>('mock_products', MOCK_PRODUCTS);
-  const product = allProducts.find(p => p.id === id);
-  return product ? { success: true, data: product } : { success: false, message: 'Not found' };
-};
-
 export const createProduct = async (product: Partial<Product>): Promise<ApiResponse<Product>> => {
-  await delay(DELAY_MS);
-  const newProduct: Product = { ...product as Product, id: `prod-${Date.now()}` };
+  const guard = ensureRole([UserRole.MERCHANT, UserRole.ADMIN]);
+  if (guard) return guard;
+
+  const session = getAuthSession()!;
+  const newProduct: Product = { 
+      ...product as Product, 
+      id: `prod-${Date.now()}`,
+      merchantId: session.id,
+      merchantName: session.username
+  };
   const products = getStorage<Product[]>('mock_products', MOCK_PRODUCTS);
   setStorage('mock_products', [...products, newProduct]);
   return { success: true, data: newProduct };
 };
 
 export const updateProduct = async (id: string, updates: Partial<Product>): Promise<ApiResponse<Product>> => {
-  await delay(DELAY_MS);
+  const session = getAuthSession();
+  if (!session) return { success: false, message: 'Unauthorized' };
+
   const products = getStorage<Product[]>('mock_products', MOCK_PRODUCTS);
   const index = products.findIndex(p => p.id === id);
   if (index === -1) return { success: false, message: 'Not found' };
+  
+  // Ensure ownership
+  if (products[index].merchantId !== session.id && session.role !== UserRole.ADMIN) {
+      return { success: false, message: 'Forbidden' };
+  }
+
   products[index] = { ...products[index], ...updates };
   setStorage('mock_products', products);
   return { success: true, data: products[index] };
 };
 
 export const deleteProduct = async (id: string): Promise<ApiResponse<boolean>> => {
-  await delay(DELAY_MS);
+  const session = getAuthSession();
+  if (!session) return { success: false, message: 'Unauthorized' };
+
   let products = getStorage<Product[]>('mock_products', MOCK_PRODUCTS);
+  const p = products.find(p => p.id === id);
+  if (!p) return { success: false, message: 'Not found' };
+
+  if (p.merchantId !== session.id && session.role !== UserRole.ADMIN) {
+      return { success: false, message: 'Forbidden' };
+  }
+
   setStorage('mock_products', products.filter(p => p.id !== id));
   return { success: true, data: true };
 };
 
-export const createOrder = async (orderData: Partial<Order>): Promise<ApiResponse<Order>> => {
-  await delay(DELAY_MS);
-  const now = new Date();
-  const dateStr = now.toISOString().slice(2,10).replace(/-/g, '');
-  const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
-  const orderId = `WM-${dateStr}-${randomStr}`;
-
-  const newOrder: Order = {
-    id: orderId,
-    userId: orderData.userId!,
-    items: orderData.items!,
-    total: orderData.total!,
-    address: orderData.address!,
-    phone: orderData.phone!,
-    realName: orderData.realName!,
-    status: 'pending',
-    createdAt: now.toISOString()
-  };
-  const orders = getStorage<Order[]>('mock_orders', []);
-  setStorage('mock_orders', [newOrder, ...orders]);
-  
-  const merchantIds = Array.from(new Set(newOrder.items.map(i => i.merchantId)));
-  merchantIds.forEach(mId => {
-      createNotification(mId, 'New Order Received', `Order ${newOrder.id} has been placed for $${newOrder.total}.`, 'success');
-  });
-
-  return { success: true, data: newOrder };
-};
-
-export const getOrders = async (userId?: string, merchantId?: string): Promise<ApiResponse<Order[]>> => {
-  await delay(DELAY_MS);
-  let orders = getStorage<Order[]>('mock_orders', []);
-  if (userId) orders = orders.filter(o => o.userId === userId);
-  if (merchantId) orders = orders.filter(o => o.items.some(i => i.merchantId === merchantId));
-  return { success: true, data: orders };
-};
-
-export const updateOrderStatus = async (orderId: string, status: Order['status'], trackingNumber?: string): Promise<ApiResponse<Order>> => {
-  await delay(DELAY_MS);
-  const orders = getStorage<Order[]>('mock_orders', []);
-  const index = orders.findIndex(o => o.id === orderId);
-  if (index === -1) return { success: false, message: 'Order not found' };
-  orders[index] = { ...orders[index], status, trackingNumber: trackingNumber || orders[index].trackingNumber };
-  setStorage('mock_orders', orders);
-  createNotification(orders[index].userId, 'Order Updated', `Your order ${orderId} is now ${status}.`, 'info');
-  return { success: true, data: orders[index] };
-};
-
-export const getReportedContent = async (): Promise<ApiResponse<Post[]>> => {
-  await delay(DELAY_MS);
-  const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
-  return { success: true, data: posts.filter(p => p.status === 'reported') };
-};
-
-export const moderateContent = async (id: string, action: 'approve' | 'delete'): Promise<ApiResponse<boolean>> => {
-  await delay(DELAY_MS);
-  let posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
-  if (action === 'delete') posts = posts.filter(p => p.id !== id);
-  else posts = posts.map(p => p.id === id ? { ...p, status: 'active' as const } : p);
-  setStorage('mock_posts', posts);
-  return { success: true, data: true };
-};
+// --- MESSAGES & OTHERS ---
 
 export const getMessages = async (userId: string): Promise<ApiResponse<NotificationMessage[]>> => {
+  const session = getAuthSession();
+  if (!session || session.id !== userId) return { success: false, message: 'Access denied' };
+  
   const msgs = getStorage<NotificationMessage[]>('mock_notifications', []);
   return { success: true, data: msgs.filter(m => m.userId === userId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) };
 };
@@ -430,12 +452,6 @@ export const markMessageRead = async (messageId: string): Promise<ApiResponse<bo
   return { success: true, data: true };
 };
 
-export const markAllMessagesRead = async (userId: string): Promise<ApiResponse<boolean>> => {
-    const msgs = getStorage<NotificationMessage[]>('mock_notifications', []);
-    setStorage('mock_notifications', msgs.map(m => m.userId === userId ? { ...m, isRead: true } : m));
-    return { success: true, data: true };
-};
-
 export const uploadFile = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -443,4 +459,112 @@ export const uploadFile = async (file: File): Promise<string> => {
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = error => reject(error);
     });
-}
+};
+
+export const getReportedContent = async (): Promise<ApiResponse<Post[]>> => {
+  const guard = ensureRole([UserRole.ADMIN]);
+  if (guard) return guard;
+  const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
+  return { success: true, data: posts.filter(p => p.status === 'reported') };
+};
+
+export const moderateContent = async (id: string, action: 'approve' | 'delete'): Promise<ApiResponse<boolean>> => {
+  const guard = ensureRole([UserRole.ADMIN]);
+  if (guard) return guard;
+
+  let posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
+  if (action === 'delete') posts = posts.filter(p => p.id !== id);
+  else posts = posts.map(p => p.id === id ? { ...p, status: 'active' as const } : p);
+  setStorage('mock_posts', posts);
+  return { success: true, data: true };
+};
+
+export const getProductById = async (id: string): Promise<ApiResponse<Product>> => {
+    const products = getStorage<Product[]>('mock_products', MOCK_PRODUCTS);
+    const p = products.find(p => p.id === id);
+    return p ? { success: true, data: p } : { success: false, message: 'Not found' };
+};
+
+export const createOrder = async (orderData: Partial<Order>): Promise<ApiResponse<Order>> => {
+  const session = getAuthSession();
+  if (!session) return { success: false, message: 'Login required' };
+
+  const now = new Date();
+  const dateStr = now.toISOString().slice(2,10).replace(/-/g, '');
+  const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const orderId = `WM-${dateStr}-${randomStr}`;
+
+  const newOrder: Order = {
+    ...orderData as Order,
+    id: orderId,
+    userId: session.id,
+    status: 'pending',
+    createdAt: now.toISOString()
+  };
+  const orders = getStorage<Order[]>('mock_orders', []);
+  setStorage('mock_orders', [newOrder, ...orders]);
+  
+  newOrder.items.forEach(i => {
+      createNotification(i.merchantId, 'New Order Received', `Order ${newOrder.id} has been placed for $${newOrder.total}.`, 'success');
+  });
+
+  return { success: true, data: newOrder };
+};
+
+export const getOrders = async (userId?: string, merchantId?: string): Promise<ApiResponse<Order[]>> => {
+  const session = getAuthSession();
+  if (!session) return { success: false, message: 'Login required' };
+
+  let orders = getStorage<Order[]>('mock_orders', []);
+  
+  // Security filter: If not admin, you only see what belongs to you
+  if (session.role !== UserRole.ADMIN) {
+      if (userId) orders = orders.filter(o => o.userId === session.id);
+      if (merchantId) orders = orders.filter(o => o.items.some(i => i.merchantId === session.id));
+  } else {
+      if (userId) orders = orders.filter(o => o.userId === userId);
+      if (merchantId) orders = orders.filter(o => o.items.some(i => i.merchantId === merchantId));
+  }
+  
+  return { success: true, data: orders };
+};
+
+export const updateOrderStatus = async (orderId: string, status: Order['status'], trackingNumber?: string): Promise<ApiResponse<Order>> => {
+  const session = getAuthSession();
+  if (!session) return { success: false, message: 'Unauthorized' };
+
+  const orders = getStorage<Order[]>('mock_orders', []);
+  const index = orders.findIndex(o => o.id === orderId);
+  if (index === -1) return { success: false, message: 'Order not found' };
+  
+  // Only merchant of at least one item or Admin can update status
+  const isMerchant = orders[index].items.some(i => i.merchantId === session.id);
+  if (!isMerchant && session.role !== UserRole.ADMIN) {
+      return { success: false, message: 'Forbidden' };
+  }
+
+  orders[index] = { ...orders[index], status, trackingNumber: trackingNumber || orders[index].trackingNumber };
+  setStorage('mock_orders', orders);
+  createNotification(orders[index].userId, 'Order Updated', `Your order ${orderId} is now ${status}.`, 'info');
+  return { success: true, data: orders[index] };
+};
+
+export const markAllMessagesRead = async (userId: string): Promise<ApiResponse<boolean>> => {
+    const session = getAuthSession();
+    if (!session || session.id !== userId) return { success: false, message: 'Forbidden' };
+
+    const msgs = getStorage<NotificationMessage[]>('mock_notifications', []);
+    setStorage('mock_notifications', msgs.map(m => m.userId === userId ? { ...m, isRead: true } : m));
+    return { success: true, data: true };
+};
+
+export const reportPost = async (postId: string, reporterId?: string): Promise<ApiResponse<boolean>> => {
+  const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
+  const index = posts.findIndex(p => p.id === postId);
+  if (index !== -1) {
+      const updated = posts.map(p => p.id === postId ? { ...p, status: 'reported' as const } : p);
+      setStorage('mock_posts', updated);
+      notifyAdmins('Content Reported', `A review for attraction ID ${posts[index].attractionId} has been reported.`, 'error');
+  }
+  return { success: true, data: true };
+};
