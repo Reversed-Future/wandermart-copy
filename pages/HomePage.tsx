@@ -80,6 +80,7 @@ export const HomePage = () => {
 
     const res = await API.createAttraction({
         ...suggestion,
+        imageUrl: suggestionImages.length > 0 ? suggestionImages[0] : '', // First image as cover
         imageUrls: suggestionImages,
         submittedBy: user?.username,
         submittedById: user?.id,

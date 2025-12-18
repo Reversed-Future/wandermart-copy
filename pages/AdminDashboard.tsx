@@ -75,7 +75,11 @@ export const AdminDashboard = () => {
           return;
       }
 
-      const payload = { ...editingAttr, imageUrls: editingImages };
+      const payload = { 
+          ...editingAttr, 
+          imageUrl: editingImages.length > 0 ? editingImages[0] : (editingAttr.imageUrl || ''), // Ensure cover is set
+          imageUrls: editingImages 
+      };
       if (targetStatus) {
           payload.status = targetStatus;
       }

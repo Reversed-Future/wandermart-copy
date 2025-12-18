@@ -130,6 +130,15 @@ const createNotification = (userId: string, title: string, content: string, type
   setStorage('mock_notifications', [newMsg, ...msgs]);
 };
 
+// Helper to notify all admins
+const notifyAdmins = (title: string, content: string, type: NotificationMessage['type'] = 'info') => {
+    const users = getStorage<User[]>('mock_users', INITIAL_USERS);
+    const admins = users.filter(u => u.role === UserRole.ADMIN);
+    admins.forEach(admin => {
+        createNotification(admin.id, title, content, type);
+    });
+};
+
 export const login = async (email: string, password: string): Promise<ApiResponse<User>> => {
   await delay(DELAY_MS);
   const users = getStorage<User[]>('mock_users', INITIAL_USERS);
@@ -149,9 +158,16 @@ export const register = async (userData: Partial<User>, password: string): Promi
     role: userData.role || UserRole.TRAVELER,
     status: userData.role === UserRole.MERCHANT ? 'pending' : 'active',
     token: `mock-jwt-new`,
-    avatarUrl: `https://i.pravatar.cc/150?u=${Date.now()}`
+    avatarUrl: `https://i.pravatar.cc/150?u=${Date.now()}`,
+    qualificationUrls: userData.qualificationUrls
   };
   setStorage('mock_users', [...users, newUser]);
+
+  // Notify admin if a merchant registered
+  if (newUser.role === UserRole.MERCHANT) {
+      notifyAdmins('New Merchant Registered', `User ${newUser.username} has applied for a merchant account.`, 'warning');
+  }
+
   return { success: true, data: newUser };
 };
 
@@ -217,6 +233,12 @@ export const createAttraction = async (attractionData: Partial<Attraction>): Pro
     status: attractionData.status || 'active'
   };
   setStorage('mock_attractions', [newAttraction, ...attractions]);
+
+  // Notify admin if a pending attraction was suggested
+  if (newAttraction.status === 'pending') {
+      notifyAdmins('New Attraction Suggested', `"${newAttraction.title}" has been suggested and needs review.`, 'info');
+  }
+
   return { success: true, data: newAttraction };
 };
 
@@ -280,8 +302,14 @@ export const deletePost = async (id: string): Promise<ApiResponse<boolean>> => {
 export const reportPost = async (postId: string, reporterId?: string): Promise<ApiResponse<boolean>> => {
   await delay(DELAY_MS);
   const posts = getStorage<Post[]>('mock_posts', MOCK_POSTS);
-  const updated = posts.map(p => p.id === postId ? { ...p, status: 'reported' as const } : p);
-  setStorage('mock_posts', updated);
+  const index = posts.findIndex(p => p.id === postId);
+  if (index !== -1) {
+      const updated = posts.map(p => p.id === postId ? { ...p, status: 'reported' as const } : p);
+      setStorage('mock_posts', updated);
+      
+      // Notify admin of reported content
+      notifyAdmins('Content Reported', `A review for attraction ID ${posts[index].attractionId} has been reported.`, 'error');
+  }
   return { success: true, data: true };
 };
 
@@ -339,8 +367,8 @@ export const createOrder = async (orderData: Partial<Order>): Promise<ApiRespons
     items: orderData.items!,
     total: orderData.total!,
     address: orderData.address!,
-    phone: orderData.phone!,       // Use provided phone
-    realName: orderData.realName!, // Use provided name
+    phone: orderData.phone!,
+    realName: orderData.realName!,
     status: 'pending',
     createdAt: now.toISOString()
   };
